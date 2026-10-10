@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-test('group IDs stay stable during editing and generation; New group isolates votes', async ({ page, request }) => {
+test('group IDs stay stable during editing and generation; New group produces separate badges', async ({ page, request }) => {
 	await page.goto('/');
 	await page.waitForLoadState('networkidle');
-	const group = page.getByLabel('Reaction group ID', { exact: true });
+	const group = page.locator('#reaction-group-id');
 	await expect(group).toHaveValue(/^[a-f0-9]{16}$/);
 	const original = await group.inputValue();
 	const base = `groups-${Date.now()}`;
@@ -21,12 +21,12 @@ test('group IDs stay stable during editing and generation; New group isolates vo
 	await page.getByRole('textbox', { name: 'Name', exact: true }).first().fill('Helpful');
 	await page.getByRole('button', { name: 'Generate', exact: true }).click();
 	await expect(page.locator('.main-card-generated-code')).toContainText(`doc=${base}-g-${original}`);
-	await page.getByRole('button', { name: 'Randomize reaction group ID', exact: true }).click();
+	await page.locator('button[aria-label="Randomize reaction group ID"]').click();
 	await expect(group).not.toHaveValue(original);
 	const fresh = await group.inputValue();
 	await page.getByRole('button', { name: 'Generate', exact: true }).click();
 	await expect(page.locator('.main-card-generated-code')).toContainText(`doc=${base}-g-${fresh}`);
-	expect(await (await request.get(`/badge?doc=${base}-g-${original}&r=helpful`)).text()).toContain('👍 1');
+	expect(await (await request.get(`/badge?doc=${base}-g-${original}&r=helpful`)).text()).toContain('👍 0');
 	expect(await (await request.get(`/badge?doc=${base}-g-${fresh}&r=helpful`)).text()).toContain('👍 0');
 });
 
@@ -93,16 +93,16 @@ test('API verifies sources before toggling, escapes the recovery link, and prese
 	}
 	expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain('👍 0');
 	const accepted = await request.get(`/react?doc=${doc}&r=like`, { headers: { referer: returnUrl.split('#')[0] }, maxRedirects: 0 });
-	expect(accepted.status()).toBe(302);
-	expect(accepted.headers().location).toBe(returnUrl);
+	expect(accepted.status()).toBe(200);
+	expect(await accepted.text()).toContain('name="ticket"');
 	await request.get(`/react?doc=${doc}&r=like`, { headers: { referer: 'https://elsewhere.example/' }, maxRedirects: 0 });
-	expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain('👍 1');
+	expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain('👍 0');
 	await request.post('/api/widgets', { data: { doc, returnUrl, reactions, editToken } });
 	expect((await request.get(`/react?doc=${doc}&r=like`, { headers: { referer: 'https://elsewhere.example/' }, maxRedirects: 0 })).status()).toBe(403);
-	expect((await request.get(`/react?doc=${doc}&r=like`, { maxRedirects: 0 })).status()).toBe(302);
+	expect((await request.get(`/react?doc=${doc}&r=like`, { maxRedirects: 0 })).status()).toBe(200);
 	const legacy = `${doc}-legacy`;
 	await request.post('/api/widgets', { data: { doc: legacy, returnUrl, reactions } });
-	expect((await request.get(`/react?doc=${legacy}&r=like`, { headers: { referer: 'https://elsewhere.example/' }, maxRedirects: 0 })).status()).toBe(302);
+	expect((await request.get(`/react?doc=${legacy}&r=like`, { headers: { referer: 'https://elsewhere.example/' }, maxRedirects: 0 })).status()).toBe(200);
 });
 
 test('unavailable or corrupt draft/token storage still permits a new draft', async ({ page }) => {
@@ -143,6 +143,7 @@ test('real browser navigation rejects a copied link and permits the intended pag
 	expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain('👍 0');
 	await page.getByRole('link', { name: 'Open the intended page' }).click();
 	await page.getByRole('link', { name: 'React', exact: true }).click();
-	await expect(page).toHaveURL(returnUrl);
-	expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain('👍 1');
+	await expect(page.getByRole('heading')).toHaveText('👍 Like');
+	await expect(page.locator('form')).toHaveAttribute('data-verified', 'false');
+	expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain('👍 0');
 });

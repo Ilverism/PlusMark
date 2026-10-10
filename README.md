@@ -77,11 +77,40 @@ use `Cache-Control: no-store` so a skipped request or voting redirect is not
 reused for a subsequent click. `robots.txt` disallows `/react`, and reaction
 responses include `X-Robots-Tag: noindex, nofollow` to discourage indexing.
 
-Ordinary clicks retain the existing add/remove behavior, including legacy badge
-URLs. These safeguards do not identify every bot: an unmarked GET can still
-vote, and crawlers can ignore robots directives. They do not remove earlier
-automated votes. `src/routes/reactions.e2e.ts` checks probes both before and after
-a real vote, as well as normal voting and the crawler directive.
+All GET requests are now read-only for votes. Existing badge links open a small
+verification page. Managed Cloudflare Turnstile runs on the first click, and the
+server validates its token, exact hostname, action, and submission ID before
+accepting a POST. Successful verification sets a signed, HttpOnly cookie for one
+hour. Subsequent clicks automatically POST and return to the source page without
+another challenge during that hour. The existing visitor cookie still identifies
+the vote, so verification expiry does not prevent removing an earlier vote.
+
+POSTs require a same-origin request and a signed, visitor-bound ticket valid for
+ten minutes. The original badge-page referrer is carried in that ticket and
+checked again at voting time. Submission receipts commit atomically with votes;
+retries cannot accidentally undo the same click, including after a server restart.
+Expired receipts are removed on subsequent submissions. Badge images remain
+public and require no Turnstile check. JavaScript and cookies are required to vote.
+Existing URLs, votes, and edit tokens are preserved; direct GET-based voting API
+clients must move to the verified flow. Previous automated votes are not removed.
+Turnstile reduces automated voting but does not guarantee a unique human or stop
+every browser scanner, especially one using an already-verified browser session.
+
+The public `TURNSTILE_SITE_KEY` and exact production `TURNSTILE_HOSTNAME` live in
+`wrangler.jsonc`. Store `TURNSTILE_SECRET` in the Worker secret binding and ignored
+local `.env`. The widget must permit the production hostname and local test hosts.
+Production never accepts a token for localhost; missing configuration fails closed.
+`pnpm preview` explicitly overrides the expected hostname to `localhost` for local
+production-build testing at `http://localhost:4173`.
+Keep `PLUSMARK_HMAC_SECRET` stable, since it also preserves existing vote identities.
+Do not deploy this route until the Turnstile secret is configured.
+
+Validation: `node --test scripts/test-reaction-verification.mjs`,
+`node scripts/test-reaction-route.mjs`, and
+`node scripts/test-reaction-location-runtime.mjs` cover verification, expiry,
+CSRF, replay protection, legacy data, and persisted production SQLite receipts.
+Browser tests cover the verification page, rejected tokens, retry handling, and
+read-only link visits. A real-widget browser check is also needed after deployment.
 
 ## Badge appearance and counts
 

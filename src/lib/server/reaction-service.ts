@@ -135,7 +135,7 @@ export async function hashEditToken(token: string): Promise<string> {
 	return sha256Hex(token);
 }
 
-export async function getVoterHash(event: RequestEvent, doc: string): Promise<string> {
+export function getVisitorId(event: RequestEvent): string {
 	let visitorId = event.cookies.get(VISITOR_COOKIE);
 
 	if (!visitorId) {
@@ -149,11 +149,14 @@ export async function getVoterHash(event: RequestEvent, doc: string): Promise<st
 		});
 	}
 
-	const secret = getHmacSecret(event);
-	return hmacHex(secret, `${doc}\0${visitorId}`);
+	return visitorId;
 }
 
-function getHmacSecret(event: RequestEvent): string {
+export async function getVoterHash(event: RequestEvent, doc: string): Promise<string> {
+	return hmacHex(getHmacSecret(event), `${doc}\0${getVisitorId(event)}`);
+}
+
+export function getHmacSecret(event: RequestEvent): string {
 	const configured = event.platform?.env.PLUSMARK_HMAC_SECRET;
 	if (configured) return configured;
 
@@ -211,6 +214,7 @@ type DevRecord = {
 };
 
 class DevReactionDocument implements ReactionDocumentStub {
+	private submissions = new Map<string, { expiresAt: number; voter: string; reaction: string; result: { ok: true; count: number; active: boolean; returnUrl: string } }>();
 	private record: DevRecord | null = null;
 	private publications = new Map<string, BadgePublication>();
 
@@ -300,7 +304,14 @@ class DevReactionDocument implements ReactionDocumentStub {
 		};
 	}
 
-	async toggleReaction(reactionId: string, voterHash: string, referrer: string | null = null) {
+	async toggleReaction(reactionId: string, voterHash: string, referrer: string | null = null, submission?: { id: string; expiresAt: number }) {
+		if (submission) {
+			if (submission.expiresAt <= Date.now()) return { ok: false, status: 410, message: 'This reaction link has expired. Click the badge again.' } satisfies DevFailure;
+			for (const [id, item] of this.submissions) if (item.expiresAt <= Date.now()) this.submissions.delete(id);
+			const previous = this.submissions.get(submission.id);
+			if (previous) return previous.voter === voterHash && previous.reaction === reactionId ? previous.result
+				: { ok: false, status: 409, message: 'Submission already used.' } satisfies DevFailure;
+		}
 		if (!this.record) return this.unknownDocument();
 		if (this.record.widget.verifyReferrer && !isReactionSourceAllowed(this.record.widget.returnUrl, referrer)) {
 			return reactionSourceFailure(this.record.widget.returnUrl);
@@ -335,12 +346,14 @@ class DevReactionDocument implements ReactionDocumentStub {
 			this.publications.get(reactionId) ?? null, reaction.count, Date.now(), true
 		));
 
-		return {
+		const result = {
 			ok: true as const,
 			count: reaction.count,
 			active,
 			returnUrl: this.record.widget.returnUrl
 		};
+		if (submission) this.submissions.set(submission.id, { ...submission, voter: voterHash, reaction: reactionId, result });
+		return result;
 	}
 
 	private unknownDocument(): DevFailure {

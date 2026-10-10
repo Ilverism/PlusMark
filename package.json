@@ -7,7 +7,7 @@
 		"build:emoji": "tsx scripts/build-reaction-emoji.ts",
 		"dev": "vite dev",
 		"build": "wrangler types --include-runtime false && node scripts/patch-worker-types.js && vite build && node scripts/export-durable-objects.js",
-		"preview": "wrangler dev build/cloudflare/_worker.js --port 4173",
+		"preview": "wrangler dev build/cloudflare/_worker.js --port 4173 --var TURNSTILE_HOSTNAME:localhost",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "wrangler types --include-runtime false && node scripts/patch-worker-types.js && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",

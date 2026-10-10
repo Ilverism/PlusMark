@@ -232,10 +232,21 @@ export class ReactionDocument extends DurableObject {
 		};
 	}
 
-	async toggleReaction(reactionId: string, voterHash: string, referrer: string | null = null): Promise<ToggleSuccess | RpcFailure> {
+	async toggleReaction(reactionId: string, voterHash: string, referrer: string | null = null, submission?: { id: string; expiresAt: number }): Promise<ToggleSuccess | RpcFailure> {
 		let badgeChanged = false;
 		let badgeThrottled = false;
 		const result = this.ctx.storage.transactionSync(() => {
+			// Receipt and vote commit together, including concurrent retries and object restarts.
+			if (submission) {
+				if (submission.expiresAt <= Date.now()) return { ok: false, status: 410, message: 'This reaction link has expired. Click the badge again.' } satisfies RpcFailure;
+				this.ctx.storage.sql.exec('DELETE FROM reaction_submissions WHERE expires_at <= ?', Date.now());
+				const previous = this.ctx.storage.sql.exec<{ voter: string; reaction: string; result: string }>(
+					'SELECT voter, reaction, result FROM reaction_submissions WHERE id = ?', submission.id
+				).toArray()[0];
+				if (previous) return previous.voter === voterHash && previous.reaction === reactionId
+					? JSON.parse(previous.result) as ToggleSuccess
+					: { ok: false, status: 409, message: 'Submission already used.' } satisfies RpcFailure;
+			}
 			const widget = this.getWidgetRow();
 			if (!widget) {
 				return {
@@ -305,12 +316,17 @@ export class ReactionDocument extends DurableObject {
 			badgeChanged = publication.changed;
 			badgeThrottled = publication.state.throttled_until > 0;
 
-			return {
+			const receipt = {
 				ok: true,
 				count,
 				active,
 				returnUrl: widget.return_url
 			} satisfies ToggleSuccess;
+			if (submission) this.ctx.storage.sql.exec(
+				'INSERT INTO reaction_submissions (id, voter, reaction, result, expires_at) VALUES (?, ?, ?, ?, ?)',
+				submission.id, voterHash, reactionId, JSON.stringify(receipt), submission.expiresAt
+			);
+			return receipt;
 		});
 
 		if (result.ok && badgeChanged) {
@@ -369,6 +385,8 @@ export class ReactionDocument extends DurableObject {
 		if (this.initialized) return;
 
 		const sql = this.ctx.storage.sql;
+		sql.exec('CREATE TABLE IF NOT EXISTS reaction_submissions (id TEXT PRIMARY KEY, voter TEXT NOT NULL, reaction TEXT NOT NULL, result TEXT NOT NULL, expires_at INTEGER NOT NULL)');
+		sql.exec('CREATE INDEX IF NOT EXISTS reaction_submissions_expiry ON reaction_submissions (expires_at)');
 		sql.exec(`CREATE TABLE IF NOT EXISTS badge_publications (
 			reaction TEXT PRIMARY KEY, window_started_at INTEGER NOT NULL, window_count INTEGER NOT NULL,
 			throttled_until INTEGER NOT NULL, published_count INTEGER NOT NULL, next_publish_at INTEGER NOT NULL

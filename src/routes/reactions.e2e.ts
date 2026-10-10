@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('automated probes do not create identities or add/remove votes', async ({ request }) => {
+test('probes do not create identities and ordinary GETs do not vote', async ({ request }) => {
 	const doc = `automated-probes-${crypto.randomUUID()}`;
 	const returnUrl = 'https://example.com/markdown-source';
 	const created = await request.post('/api/widgets', {
@@ -20,7 +20,7 @@ test('automated probes do not create identities or add/remove votes', async ({ r
 		{ method: 'HEAD', headers: {} },
 		...speculativeHeaders.map(headers => ({ method: 'GET', headers }))
 	];
-	for (const count of [0, 1]) {
+	for (let visit = 0; visit < 2; visit++) {
 		for (const probe of probes) {
 			const response = await request.fetch(reactionUrl, { ...probe, maxRedirects: 0 });
 			expect(response.status()).toBe(204);
@@ -29,16 +29,64 @@ test('automated probes do not create identities or add/remove votes', async ({ r
 			expect(response.headers().location).toBeUndefined();
 			expect(response.headers()['cache-control']).toContain('no-store');
 			expect(response.headers()['x-robots-tag']).toBe('noindex, nofollow');
-			expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain(`👍 ${count}`);
+			expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain('👍 0');
 		}
-		// The same visitor still adds/removes a vote through an ordinary link request.
+		// Ordinary link fetches also remain read-only until a verified POST.
 		const click = await request.get(reactionUrl, { maxRedirects: 0 });
-		expect(click.status()).toBe(302);
-		expect(click.headers().location).toBe(returnUrl);
+		expect(click.status()).toBe(200);
+		expect(await click.text()).toContain('name="ticket"');
 		expect(click.headers()['cache-control']).toContain('no-store');
 		expect(click.headers()['x-robots-tag']).toBe('noindex, nofollow');
-		expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain(`👍 ${1 - count}`);
+		expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain('👍 0');
 	}
+});
+
+test('verification rejects a fake token and permits an explicit retry without an automatic loop', async ({ page, request }) => {
+	const doc = `verification-failure-${crypto.randomUUID()}`;
+	await request.post('/api/widgets', { data: { doc, returnUrl: 'https://example.com/', reactions: [{ id: 'like', emoji: '👍', label: 'Like', description: '' }] } });
+	await page.route('https://challenges.cloudflare.com/turnstile/v0/api.js*', route => route.fulfill({
+		contentType: 'text/javascript', body: `window.turnstile = {
+			render(selector, options) { this.options=options; setTimeout(()=>options.callback('invalid-test-token'),0); return 'test'; },
+			reset() { setTimeout(()=>this.options.callback('invalid-test-token'),0); }
+		};`
+	}));
+	let posts = 0;
+	page.on('request', req => { if (req.method() === 'POST' && req.url().includes('/react?')) posts++; });
+	await page.goto(`/react?doc=${doc}&r=like`);
+	await expect(page.getByRole('status')).toContainText('Verification failed', { timeout: 15000 });
+	const retry = page.getByRole('button', { name: 'Try again' });
+	await expect(retry).toBeEnabled();
+	expect(posts).toBe(1);
+	await retry.click();
+	await expect(page.getByRole('status')).toContainText('Verification failed', { timeout: 15000 });
+	await expect(retry).toBeEnabled();
+	expect(posts).toBe(2);
+	expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain('👍 0');
+});
+
+test('verified-page script posts once and returns to the saved URL', async ({ page, request, baseURL }) => {
+	const doc = `verification-navigation-${crypto.randomUUID()}`;
+	const returnUrl = new URL('/test-return', baseURL).href;
+	await request.post('/api/widgets', { data: { doc, returnUrl, reactions: [{ id: 'like', emoji: '👍', label: 'Like', description: '' }] } });
+	let posts = 0;
+	let challenges = 0;
+	await page.route('https://challenges.cloudflare.com/**', route => { challenges++; return route.abort(); });
+	await page.route('**/test-return', route => route.fulfill({ contentType: 'text/html', body: '<h1>Returned</h1>' }));
+	await page.route('**/react?**', async route => {
+		if (route.request().method() === 'POST') {
+			posts++;
+			expect(route.request().headers().origin).toBe(new URL(baseURL!).origin);
+			expect(new URLSearchParams(route.request().postData()!).get('ticket')).toBeTruthy();
+			return route.fulfill({ json: { returnUrl } });
+		}
+		// Exercise the fast-path browser script; real authorization is covered by the route tests.
+		const response = await route.fetch();
+		await route.fulfill({ response, body: (await response.text()).replace('data-verified="false"', 'data-verified="true"') });
+	});
+	await page.goto(`/react?doc=${doc}&r=like`);
+	await expect(page).toHaveURL(returnUrl);
+	expect(posts).toBe(1);
+	expect(challenges).toBe(0);
 });
 
 test('crawler guidance excludes reaction links', async ({ request }) => {
@@ -47,7 +95,7 @@ test('crawler guidance excludes reaction links', async ({ request }) => {
 	expect(await robots.text()).toMatch(/^Disallow: \/react\s*$/m);
 });
 
-test('creates, protects, badges, and toggles a reaction widget', async ({ request }) => {
+test('creates, protects, and renders a reaction widget without voting on GET', async ({ request }) => {
 	const doc = `playwright-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 	const returnUrl = 'https://example.com/markdown-source';
 	const reactions = [
@@ -93,14 +141,14 @@ test('creates, protects, badges, and toggles a reaction widget', async ({ reques
 	const firstClick = await request.get(`/react?doc=${doc}&r=thumbs-up`, {
 		maxRedirects: 0
 	});
-	expect(firstClick.status()).toBe(302);
-	expect(firstClick.headers().location).toBe(returnUrl);
+	expect(firstClick.status()).toBe(200);
+	expect(await firstClick.text()).toContain('data-verified="false"');
 
 	const setCookie = firstClick.headers()['set-cookie'];
 	expect(setCookie).toContain('pm_vid=');
 
 	const badgeAfterClick = await request.get(`/badge?doc=${doc}&r=thumbs-up`);
-	expect(await badgeAfterClick.text()).toContain('👍 1');
+	expect(await badgeAfterClick.text()).toContain('👍 0');
 	expect(await badgeAfterClick.text()).toContain('filter="url(#emoji-shadow)"');
 	// Camo cached stale counts without an explicit zero TTL, despite no-cache/no-store.
 	expect(badgeAfterClick.headers()['cache-control']).toContain('max-age=0');
@@ -109,7 +157,7 @@ test('creates, protects, badges, and toggles a reaction widget', async ({ reques
 		headers: { cookie: setCookie.split(';')[0] },
 		maxRedirects: 0
 	});
-	expect(secondClick.status()).toBe(302);
+	expect(secondClick.status()).toBe(200);
 
 	const badgeAfterToggle = await request.get(`/badge?doc=${doc}&r=thumbs-up`);
 	expect(await badgeAfterToggle.text()).toContain('👍 0');

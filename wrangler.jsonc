@@ -1,6 +1,10 @@
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "plusmark",
+	"vars": {
+		"TURNSTILE_SITE_KEY": "0x4AAAAAAFTa2ln7y9mcnv5S",
+		"TURNSTILE_HOSTNAME": "plusmark.ilverism.workers.dev"
+	},
 	"compatibility_date": "2026-05-23",
 	"compatibility_flags": [
 		"nodejs_compat"

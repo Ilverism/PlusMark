@@ -67,7 +67,15 @@ try {
 	assert.equal((await rpc('doc-g-second', 'getBadge', 'like')).reaction.count, 0);
 	assert.equal((await rpc('doc-g-second', 'toggleReaction', 'like', 'same-user', null)).count, 1);
 	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', 'https://example.com/')).count, 0);
+	const submission = { id: crypto.randomUUID(), expiresAt: Date.now() + 600_000 };
+	const retries = await Promise.all(Array.from({ length: 8 }, () => rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', 'https://example.com/', submission)));
+	assert.ok(retries.every(result => result.ok && result.count === 1 && result.active));
+	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'other-user', null, submission)).status, 409);
+	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', null, { id: 'expired', expiresAt: Date.now() - 1 })).status, 410);
 	await mf.setOptions({ ...options, script: bundle.outputFiles[0].text + '\n// restart' });
+	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', null, submission)).count, 1);
+	assert.equal((await rpc('doc-g-first', 'getBadge', 'like')).reaction.count, 1);
+	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', null, { ...submission, id: crypto.randomUUID() })).count, 0);
 	assert.equal((await rpc('doc-g-first', 'getWidget')).widget.verifyReferrer, true);
 	assert.equal((await rpc('doc-g-second', 'getBadge', 'like')).reaction.count, 1);
 	console.log('PASS: production SQLite migration, legacy votes/tokens, guard updates/persistence, rejected undo, independent groups, unknown sources, restart');

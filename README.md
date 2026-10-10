@@ -1,3 +1,13 @@
+[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=thumbs-up)
+
+[![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=thumbs-down)
+
+[![🔥 Awesome](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=awesome)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=awesome)
+
+[![👀 Uhhhhh](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=uhhhhh)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=uhhhhh)
+
+[![PlusMark](https://plusmark.ilverism.workers.dev/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)
+
 # sv
 
 ## Reaction groups and source checks

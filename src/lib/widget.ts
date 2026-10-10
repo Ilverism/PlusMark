@@ -141,7 +141,7 @@ export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnU
 		.concat(includePlusMarkBadge
 			? [`[![PlusMark](${baseUrl}/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)`]
 			: [])
-		.join('\n\n');
+		.join(' ');
 }
 
 function slugify(input: string, maxLength: number): string {

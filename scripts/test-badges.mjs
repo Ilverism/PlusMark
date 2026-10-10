@@ -84,7 +84,8 @@ test('appends exactly one linked logo badge after all reaction badges', () => {
 		{ id: 'like', emoji: '👍', label: 'Like', description: '' },
 		{ id: 'love', emoji: '❤️', label: 'Love', description: '' }
 	] }, 'https://badges.example/');
-	assert.equal(markdown.split('\n\n').length, 3);
+	assert.equal(markdown.split(') [![').length, 3);
+	assert.ok(!/[\r\n]/.test(markdown));
 	assert.ok(markdown.endsWith('[![PlusMark](https://badges.example/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)'));
 	assert.equal(markdown.match(/PlusMark-badge\.svg/g).length, 1);
 	assert.ok(markdown.includes('/react?doc=example&r=love'));
@@ -96,7 +97,7 @@ test('can omit the PlusMark badge without changing reaction links', () => {
 	] };
 	const markdown = buildMarkdownSnippet(widget, 'https://badges.example', false);
 	assert.ok(!markdown.includes('PlusMark-badge.svg'));
-	assert.equal(markdown, buildMarkdownSnippet(widget, 'https://badges.example').split('\n\n')[0]);
+	assert.equal(markdown, buildMarkdownSnippet(widget, 'https://badges.example').split(' [![PlusMark]')[0]);
 });
 
 test('badge responses are identical within a display range and escape SVG content', async () => {

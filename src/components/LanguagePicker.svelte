@@ -1,7 +1,7 @@
 <!-- src/components/LanguagePicker.svelte -->
 <script lang="ts">
+    import { getLocale, locales, setLocale } from '$lib/paraglide/runtime';
     import { Languages } from "@lucide/svelte";
-	import { locales, getLocale, setLocale } from '$lib/paraglide/runtime';
 
 	type Props = {
 		cLass?: string;
@@ -37,11 +37,12 @@
 </select>
 
 <style lang="postcss">
-	@import "tailwindcss";
+	@reference "tailwindcss";
+	@reference "../routes/layout.css";
 
 	.language-picker {
 		@apply cursor-pointer;
-		@apply text-gray-600;
+		@apply text-muted-foreground;
 		@apply font-semibold;
 		@apply decoration-0 underline-offset-2;
 		@apply hover:underline;
@@ -54,7 +55,7 @@
 	}
 
 	option {
-		@apply bg-orange-300;
+		@apply bg-card;
 	}
 
 </style>

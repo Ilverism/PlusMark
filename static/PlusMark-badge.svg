@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="24" viewBox="0 0 48 24" role="img" aria-label="PlusMark">
+  <title>PlusMark</title>
+  <!-- Tailwind orange-200. -->
+  <rect width="48" height="24" rx="12" fill="oklch(90.1% 0.076 70.697)"/>
+  <svg x="11" y="4" width="26" height="16" viewBox="0 0 208 128">
+    <g transform="translate(208,0) scale(-1,1)" fill="#000" stroke="#000">
+      <rect x="5" y="5" width="198" height="118" rx="10" ry="10" fill="none" stroke-width="10"/>
+      <path stroke="none" d="M30 98V30h20l20 25 20-25h20v68H90V59L70 84 50 59v39H30z"/>
+      <path stroke="none" d="M145 34h20v20h20v20h-20v20h-20V74h-20V54h20V34z"/>
+    </g>
+  </svg>
+</svg>

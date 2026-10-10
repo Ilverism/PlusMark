@@ -31,10 +31,11 @@
 
 <style lang="postcss">
 
-	@import "tailwindcss";
+	@reference "tailwindcss";
+	@reference "../routes/layout.css";
 
 	.text-button {
-		@apply text-gray-500;
+		@apply text-muted-foreground;
 		@apply font-semibold;
 		@apply decoration-0 underline-offset-2;
 

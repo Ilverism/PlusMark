@@ -1,0 +1,76 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
+const wranglerRequire = createRequire(require.resolve('wrangler'));
+const { Miniflare } = wranglerRequire('miniflare');
+const { build } = wranglerRequire('esbuild');
+const root = fileURLToPath(new URL('../', import.meta.url));
+const dispatch = `export default {async fetch(request,env) {
+ const {doc, action, args=[]} = await request.json();
+ const stub=env.REACTION_DOCUMENTS.get(env.REACTION_DOCUMENTS.idFromName(doc));
+ return Response.json(await stub[action](...args));
+}};`;
+const bundle = await build({
+	stdin: { contents: `export { ReactionDocument } from './src/lib/server/reaction-document.ts';\n${dispatch}`, resolveDir: root, loader: 'ts' },
+	bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', external: ['cloudflare:workers']
+});
+// Start with a populated pre-change database, then restart the same objects with the new code.
+const legacy = `import {DurableObject} from 'cloudflare:workers';
+export class ReactionDocument extends DurableObject {
+ async seed() {
+  this.ctx.storage.sql.exec("CREATE TABLE widget (doc TEXT PRIMARY KEY, return_url TEXT NOT NULL, edit_token_hash TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)");
+  this.ctx.storage.sql.exec("INSERT INTO widget VALUES ('legacy','https://example.com/article','secret',1,1)");
+  this.ctx.storage.sql.exec("CREATE TABLE reactions (id TEXT PRIMARY KEY, emoji TEXT NOT NULL, label TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', sort_order INTEGER NOT NULL)");
+  this.ctx.storage.sql.exec("INSERT INTO reactions VALUES ('like','👍','Like','',0)");
+  this.ctx.storage.sql.exec("CREATE TABLE counts (reaction TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0)");
+  this.ctx.storage.sql.exec("INSERT INTO counts VALUES ('like',1)");
+  this.ctx.storage.sql.exec("CREATE TABLE votes (reaction TEXT NOT NULL, voter_hash TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (reaction,voter_hash))");
+  this.ctx.storage.sql.exec("INSERT INTO votes VALUES ('like','existing-voter',1)");
+  return {ok:true};
+ }
+}
+${dispatch}`;
+const options = { modules: true, compatibilityDate: '2026-05-23', durableObjects: { REACTION_DOCUMENTS: { className: 'ReactionDocument', useSQLite: true } } };
+const mf = new Miniflare({ ...options, script: legacy });
+async function rpc(doc, action, ...args) {
+	const response = await mf.dispatchFetch('https://example.com/test', { method: 'POST', body: JSON.stringify({ doc, action, args }) });
+	assert.equal(response.status, 200);
+	return response.json();
+}
+const reactions = [{ id: 'like', emoji: '👍', label: 'Like', description: '' }];
+const save = (doc, verifyReferrer, editTokenHash = null) => rpc(doc, 'saveWidget', {
+	widget: { doc, returnUrl: 'https://example.com/article#section', reactions, verifyReferrer }, editTokenHash, createEditTokenHash: 'secret'
+});
+try {
+	await rpc('legacy', 'seed');
+	await mf.setOptions({ ...options, script: bundle.outputFiles[0].text });
+	let legacyWidget = await rpc('legacy', 'getWidget');
+	assert.equal(legacyWidget.widget.verifyReferrer, false);
+	assert.equal(legacyWidget.widget.reactions[0].count, 1);
+	assert.equal((await rpc('legacy', 'toggleReaction', 'like', 'existing-voter', 'https://other.example/')).count, 0);
+	assert.equal((await save('legacy', true, 'wrong')).ok, false);
+	assert.equal((await save('legacy', true, 'secret')).ok, true);
+	assert.equal((await rpc('legacy', 'toggleReaction', 'like', 'new', 'https://other.example/')).status, 403);
+	await save('legacy', undefined, 'secret');
+	assert.equal((await rpc('legacy', 'getWidget')).widget.verifyReferrer, true, 'old clients must not disable an existing guard');
+	await save('legacy', false, 'secret');
+	assert.equal((await rpc('legacy', 'toggleReaction', 'like', 'new', 'https://other.example/')).count, 1);
+
+	for (const doc of ['doc-g-first', 'doc-g-second']) assert.equal((await save(doc, true)).ok, true);
+	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', 'https://example.com/article')).count, 1);
+	const denied = await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', 'https://example.com/other');
+	assert.equal(denied.status, 403);
+	assert.equal(denied.returnUrl, 'https://example.com/article#section');
+	assert.equal((await rpc('doc-g-first', 'getBadge', 'like')).reaction.count, 1, 'denied undo must not change the count');
+	assert.equal((await rpc('doc-g-second', 'getBadge', 'like')).reaction.count, 0);
+	assert.equal((await rpc('doc-g-second', 'toggleReaction', 'like', 'same-user', null)).count, 1);
+	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', 'https://example.com/')).count, 0);
+	await mf.setOptions({ ...options, script: bundle.outputFiles[0].text + '\n// restart' });
+	assert.equal((await rpc('doc-g-first', 'getWidget')).widget.verifyReferrer, true);
+	assert.equal((await rpc('doc-g-second', 'getBadge', 'like')).reaction.count, 1);
+	console.log('PASS: production SQLite migration, legacy votes/tokens, guard updates/persistence, rejected undo, independent groups, unknown sources, restart');
+} finally {
+	await mf.dispose();
+}

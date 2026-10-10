@@ -1,5 +1,102 @@
 # sv
 
+## Reaction groups and source checks
+
+The generator creates a random 16-character reaction group ID (64 random bits).
+It stays fixed through edits and regeneration within the current page visit.
+Return URL, Content ID, reactions, and generated output start fresh on reload; a
+new random group ID is created. Only the two Main Card checkboxes, locale, and
+theme are retained between sessions. Old saved drafts are discarded automatically
+(their source-check preference is migrated). **Randomize reaction group ID** creates a new ID and separate counters;
+previously pasted badges and their votes remain intact. You can instead enter a
+manual group ID (up to 32 letters, numbers, or single separating dashes), or clear
+the field to use a legacy Content ID without a suffix. IDs are case-insensitive.
+
+The generated badge ID is `<normalized-content-id>-g-<group-id>`. The existing
+`doc` and `r` URL parameters and storage namespace are unchanged. Combined IDs
+over 120 characters are rejected, not truncated. The Badge ID preview shows the
+actual key. Reusing that key reuses the group, whether it was entered manually or
+generated. Group IDs reduce accidental collisions; they are not secrets or access
+tokens. Copying a badge copies its group identity too.
+
+**Reject votes from other URLs** defaults on in new generator drafts. The server checks
+the HTTP `Referer` inside the same transaction that adds/removes the vote. A
+different origin or page path returns 403 without changing the vote, with a link
+to the intended page. Configured query parameters must match (including repeated
+values); extra query parameters are allowed. Fragments are ignored, so comments
+and sections on the same page cannot be distinguished. Paths remain exact,
+including trailing slashes; alternate renderings such as a GitHub README on the
+repository landing page need the check disabled if one group must work at both
+URLs. The Return URL retains its fragment for navigation back to the section.
+
+Missing, malformed, non-HTTP, and same-origin origin-only referrers are treated
+as unknown and allowed. This is a best-effort guard against accidental reuse and
+ordinary clicks from other pages, not authentication: clients can omit or forge
+the header. Image requests are not restricted because Camo strips source context.
+
+### Compatibility policy
+
+- Existing badge URLs, stored counts, voter identities, and edit tokens continue
+  working. Browser edit tokens now use tab-scoped session storage; old locally
+  stored tokens are moved there. They survive reloads, but a new tab session does
+  not retain edit access to previously generated groups. An additive SQLite column defaults existing widgets to source checks
+  **off**. No database reset or badge regeneration is required.
+- API creates that omit `verifyReferrer` also default off. Authorized updates that
+  omit it preserve the current setting; only an explicit boolean changes it.
+  Enabling it for an old widget requires its existing edit token.
+- To edit an old widget in the generator, enter its old Content ID, clear the
+  group ID, and choose the source-check setting intentionally. Changing the
+  group ID creates a different widget; it does not migrate votes.
+- Prefer additive fields and opt-in migrations for already published Markdown.
+  An incompatible URL/key change should use a versioned contract and a migration
+  plan. During this private testing phase, a documented reset can be reasonable
+  with explicit owner approval; it should never happen silently during deployment.
+
+Validation: `node --test scripts/test-reaction-location.mjs` checks matching and
+identity edge cases; `node scripts/test-reaction-location-runtime.mjs` runs the
+production Durable Object against a populated legacy SQLite schema, including
+restart persistence. `src/routes/reaction-groups.e2e.ts` covers the form, API,
+fresh form state, checkbox preferences, separate counters, and real browser navigation.
+
+## Badge appearance and counts
+
+Reaction badges add a subtle shadow behind the emoji. Counts below 1,000 remain
+exact; larger counts are truncated to one decimal place using `k`, `m`, `b`, or
+`t` (trailing `.0` is omitted). For example, 2,315 and 2,388 both display `2.3k`,
+while 1,323,521 displays `1.3m`. Storage and API responses retain the exact total.
+Votes only queue the fallback Camo purge when the displayed count or throttle indicator changes;
+pending purges and retries are preserved when subsequent votes stay in that range.
+
+By default, generated Markdown ends with a logo-only PlusMark badge on the
+Tailwind `orange-200` background, linking to the hosted PlusMark site. The
+"Include PlusMark badge" checkbox below Content ID controls its inclusion and
+remembers the choice in local storage for this browser.
+Previously pasted Markdown needs regeneration or the logo link appended manually.
+
+## Busy-traffic badge updates
+
+At 300 accepted add/remove actions within a per-reaction 60-second traffic window,
+the badge enters throttled mode. Votes still update the exact count immediately,
+but the public badge publishes a snapshot at most once every 60 seconds, with a
+small gray hourglass indicating delayed counts. A qualifying busy window extends
+the cooldown; when it expires, a Durable Object alarm publishes the final count
+and removes the indicator, even if nobody requests the badge again. Entering and
+leaving throttled mode are additional publications, including when compact counts
+such as `2.3k` remain unchanged. Quiet reactions remain live.
+
+Throttled SVG responses are cached internally at the Cloudflare edge until the
+next scheduled publication, avoiding Durable Object reads on cache hits. The
+outgoing headers remain `no-cache`/`no-store`; Camo retains its existing purge
+budgets (15 minutes per target, eight attempts per document per hour). Neither a
+60-second snapshot interval nor the hourglass guarantees GitHub refreshes within
+60 seconds. Existing cached images may initially omit the indicator.
+
+Thresholds are defined in `src/lib/server/badge-throttle.ts`. Throttle state is
+stored in the additive `badge_publications` SQLite table; existing votes and
+counts are preserved. Development mode uses the same policy but refreshes lazily
+on badge reads. This protects refresh workload, not vote integrity: it does not
+reject automated votes or eliminate incoming Worker request charges.
+
 ## GitHub reaction image freshness
 
 The `/badge` endpoint must send `Cache-Control: max-age=0, no-cache, no-store,
@@ -23,7 +120,8 @@ pages without access.
 Requires Node.js 24+ and the project's Playwright Chromium installation.
 
 ```sh
-node --test scripts/test-camo-purge.mjs
+node --test scripts/test-badges.mjs scripts/test-camo-purge.mjs
+node scripts/test-badge-throttle.mjs # Local workerd/SQLite/cache check; includes a 65-second cooldown
 pnpm exec playwright test
 node scripts/probe-github-cache.mjs https://plusmark.ilverism.workers.dev
 node scripts/probe-browser-cache.mjs https://plusmark.ilverism.workers.dev
@@ -51,6 +149,34 @@ headers and needed no purge. One initial browser run timed out waiting for an
 image response; a diagnostic run and the repeat completed successfully. The
 private GitHub issue itself was inaccessible to the test browser, so navigation
 within GitHub's authenticated UI still needs a manual check.
+
+## Emoji picker performance
+
+The picker lazily loads and reuses its immutable catalog. An IntersectionObserver
+reveals emoji artwork within the scroll area plus one nearby row; all buttons stay
+in the DOM for native keyboard navigation. Offscreen artwork uses
+`content-visibility: hidden` until revealed. Per-emoji forced graphics layers and
+blurred text shadows are removed, and panel transitions take 120 ms in / 80 ms out.
+
+Run `pnpm exec playwright test` for category, scrolling, keyboard selection,
+search, and rapid reopen coverage. To reproduce the performance measurements,
+build with `pnpm build`, run `pnpm preview`, then in another terminal run:
+
+```sh
+node scripts/profile-emoji-picker.mjs http://127.0.0.1:4173 local
+```
+
+The probe uses Chromium with 4x CPU throttling, three interaction cycles, and
+writes JSON and a screenshot to `.cache-probes/`. `nextPaintMs` estimates click
+response using animation frames; `readyPaintMs` waits for emoji content to be
+revealed (or the closing panel to be removed), then allows painting. These are
+lab estimates, not field INP measurements.
+
+Hosted measurements on October 8, 2026: large category content appeared in
+272–308 ms on the first visit and about 102–118 ms on repeat visits, versus
+740–942 ms before the change. Closing took about 136 ms instead of 365–388 ms.
+The initial catalog/font load still took about 281 ms. Results depend on browser,
+hardware, fonts, and network; Firefox and Safari were not profiled.
 
 ---
 

@@ -1,7 +1,7 @@
 <!-- src/components/ReactionCardEmoji.svelte -->
 <script lang="ts">
+    import Manager from "$lib/Manager.svelte";
     import type Reaction from "../Reaction.svelte";
-	import Manager from "$lib/Manager.svelte";
 
 
 	type Props = {
@@ -28,7 +28,7 @@
 
 
 <style lang="postcss">
-	@import "tailwindcss";
+	@reference "tailwindcss";
 	@reference "../routes/layout.css";
 
 	.reaction-card-emoji-picker {
@@ -39,16 +39,16 @@
 		@apply pb-1;
 		@apply relative;
 		@apply w-20 aspect-square;
-		@apply bg-orange-50;
+		@apply bg-popover;
 		@apply rounded-full;
 		@apply select-none;
 
 		@apply drop-shadow-sm;
 
-		@apply ring-4 ring-orange-200;
+		@apply ring-4 ring-secondary;
 
-		@apply hover:bg-sky-600;
-		@apply hover:ring-white;
+		@apply hover:bg-accent;
+		@apply hover:ring-accent-foreground;
 	}
 
 	.reaction-card-emoji-icon {

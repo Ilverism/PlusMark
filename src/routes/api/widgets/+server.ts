@@ -27,6 +27,7 @@ export const POST: RequestHandler = async (event) => {
 		widget: {
 			doc: parsed.doc,
 			returnUrl: parsed.returnUrl,
+			verifyReferrer: parsed.verifyReferrer,
 			reactions: parsed.reactions
 		},
 		editTokenHash,

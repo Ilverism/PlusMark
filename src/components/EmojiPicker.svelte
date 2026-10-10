@@ -1,17 +1,40 @@
 <!-- src/components/EmojiPicker.svelte -->
-<script lang="ts">
+<script module lang="ts">
     import type { EmojiCategory } from "$lib/emoji";
+	let cachedCategories: EmojiCategory[] = [];
+</script>
+
+<script lang="ts">
     import { onMount } from "svelte";
+	import { Input } from "$lib/components/ui/input";
 	import Manager from "$lib/Manager.svelte";
     import { fade, scale } from "svelte/transition";
     import { cubicInOut, cubicOut } from "svelte/easing";
     import { BadgeQuestionMark, LoaderCircle, Triangle } from "@lucide/svelte";
 
 	let search = $state("");
-	let categories = $state<EmojiCategory[]>([]);
+	// The catalog is immutable; avoid creating a reactive proxy for every emoji.
+	let categories = $state.raw(cachedCategories);
 	let activeCategoryId = $state("reactions");
 	let isLoadingEmoji = $state(false);
 	let didFailToLoadEmojiFile = $state(false);
+	let grid: HTMLDivElement;
+	let emojiObserver: IntersectionObserver | undefined;
+
+	// Keep native buttons for keyboard navigation, but only shape and paint emoji
+	// near the scroll viewport. Rendering an entire category blocks on color fonts.
+	function revealEmoji(node: HTMLButtonElement) {
+		emojiObserver ??= new IntersectionObserver((entries) => {
+			for (const entry of entries) {
+				if (entry.isIntersecting) {
+					(entry.target as HTMLElement).style.contentVisibility = "visible";
+					emojiObserver!.unobserve(entry.target);
+				}
+			}
+		}, { root: node.parentElement, rootMargin: "44px 0px" });
+		emojiObserver.observe(node);
+		return () => emojiObserver?.unobserve(node);
+	}
 
 	const normalizedSearch = $derived(search.trim().toLowerCase());
 
@@ -44,7 +67,7 @@
 			const module = await import("$lib/generated/reaction-emojis.json");
 			const loadedCategories = module.default as EmojiCategory[];
 
-			categories = loadedCategories;
+			cachedCategories = categories = loadedCategories;
 
 			if (loadedCategories.some((category) => category.id === "reactions")) {
 				activeCategoryId = "reactions";
@@ -69,6 +92,7 @@
 	};
 
 	const selectCategory = (categoryId: string) => {
+		grid.scrollTop = 0;
 		activeCategoryId = categoryId;
 		search = "";
 	};
@@ -89,8 +113,6 @@
 		// No anchor position available -> Default to top-left corner
 		if (anchorRect === null)
 			return ANCHOR_POS_DEFAULT;
-
-		console.log("Anchor Rect:", anchorRect);
 
 		const preferredTop = anchorRect.top - pickerHeight - pickerGap;
 		const fallbackTop = anchorRect.bottom + pickerGap;
@@ -123,25 +145,10 @@
 			Manager.closeEmojiPicker();
 		};
 
-		const targetElement = document.getElementById('emoji-picker-container');
-		document.addEventListener('click', () => {
-
-			// Target element not found
-			if (!targetElement)
-				return;
-
-			// // event.target is typed as EventTarget | null; ensure it's a Node before calling contains
-			// const maybeNode = event.target;
-			// if (!(maybeNode instanceof Node))
-			// 	return;
-
-			// if (!targetElement.contains(maybeNode))
-			// 	close();
-		});
-
 		window.addEventListener("resize", close);
 		return () => {
 			window.removeEventListener("resize", close);
+			emojiObserver?.disconnect();
 		};
 	
 	});
@@ -155,8 +162,7 @@
 >
 
 	<div
-		in:scale={{duration: 300, start: 0.00, easing: cubicOut}}
-		out:scale={{duration: 300, start: 0.00, easing: cubicOut}}
+		in:scale={{duration: 200, start: 0.67, easing: cubicOut}}
 		class="emoji-picker-transition-layer"
 	>
 
@@ -164,17 +170,20 @@
 		<div
 			class="reaction-card-emoji-menu"
 			role="dialog"
+			aria-label="Choose an emoji"
 		>
-			<input
+			<Input
 				class="reaction-card-emoji-search"
 				type="search"
+				aria-label="Search emoji"
 				placeholder="Search emoji"
 				bind:value={search}
+				oninput={() => { grid.scrollTop = 0; }}
 			/>
 
 			<!-- Category Tabs -->
 			{#if hasCategoriesAvailable}
-				<div class="reaction-card-emoji-categories" aria-label="Emoji categories">
+				<div class="reaction-card-emoji-categories" class:searching={!!normalizedSearch} aria-label="Emoji categories">
 					{#each categories as category (category.id)}
 						<button
 							type="button"
@@ -193,14 +202,15 @@
 			{/if}
 
 			<!-- Emoji Grid -->
-			<div class="reaction-card-emoji-grid py-4">
+			<div class="reaction-card-emoji-grid py-4" {@attach (node) => { grid = node; }}>
 				{#if isLoadingEmoji}
-					<div transition:fade={{duration: 400, easing: cubicInOut}} class="animate-spin text-orange-200 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+					<div transition:fade={{duration: 400, easing: cubicInOut}} class="animate-spin text-secondary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
 						<LoaderCircle size={64} strokeWidth={4}  />
 					</div>
 				{:else}
 					{#each visibleEmojis as entry (entry.emoji)}
 						<button
+							{@attach revealEmoji}
 							class="reaction-card-emoji-option group"
 							aria-label={entry.name}
 							title={entry.name}
@@ -212,8 +222,11 @@
 						</button>
 
 					{:else}
-						<div transition:fade={{duration: 400, easing: cubicInOut}} class="animate-pulse text-orange-200 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+						<div class="text-card absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
 							<BadgeQuestionMark size={64} strokeWidth={2}  />
+							<span class="text-xl font-semibold">
+								No matches found
+							</span>
 						</div>
 					{/each}
 				{/if}
@@ -224,15 +237,17 @@
 				<p class="reaction-card-emoji-note">Could not load emoji list.</p>
 			{/if}
 
-			<!-- Down arrow icon (Fill Illusion) -->
-			<Triangle fill="var(--color-orange-300)" class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 text-orange-300 rotate-180" size={24} strokeWidth={4} />
-			
 
 
 		</div>
 		
+
+			<!-- Down arrow icon (Fill Illusion) -->
+			<Triangle fill="var(--color-background)" class="absolute z-101 bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 text-background rotate-180" size={24} strokeWidth={4} />
+			
+
 		<!-- Down arrow icon (Bottom Stroke) -->
-		<Triangle fill="var(--color-orange-300)" class="absolute -bottom-2 left-1/2 -translate-x-1/2 translate-y-1/3 text-orange-200 rotate-180" size={24} strokeWidth={4} />
+		<Triangle fill="var(--color-secondary)" class="absolute z-100 -bottom-2 left-1/2 -mb-0.75 -translate-x-1/2 translate-y-1/3 text-secondary rotate-180" size={24} strokeWidth={4} />
 
 	</div>
 
@@ -245,15 +260,6 @@
 	@reference "tailwindcss";
 	@reference "../routes/layout.css";
 
-	input {
-		@apply bg-orange-50;
-		@apply ring-2 ring-orange-200;
-		@apply px-2 py-1;
-		@apply rounded-md;
-		@apply w-full;
-
-		@apply drop-shadow-sm;
-	}
 
 
 	.emoji-picker-container {
@@ -267,34 +273,32 @@
 
 		@apply flex items-start justify-center;
 
-		@apply drop-shadow-sm;
 	}
 
 	.emoji-picker-transition-layer {
 		@apply relative;
 		@apply w-full h-full;
 
-		will-change: transform, opacity;
 		transform-origin: bottom center;
-		/* contain: paint; */
 	}
 
 	.reaction-card-emoji-menu {
 		@apply overflow-visible;
 		
-		@apply fixed;
+		@apply absolute;
 
 		@apply w-full h-full;
 		@apply p-2;
 
 		@apply rounded-lg;
-		@apply bg-orange-300;
+		@apply bg-background;
+		@apply shadow-sm;
 
 		@apply z-100;
 
 		@apply flex flex-col;
 	
-		@apply border-b-4 border-orange-200;
+		@apply border-b-4 border-secondary;
 
 	}
 
@@ -303,7 +307,7 @@
 		@apply pointer-events-none;
 		@apply **:pointer-events-auto;
 		
-		@apply bg-orange-200;
+		@apply bg-secondary;
 		@apply rounded-md;
 		@apply w-fit mx-auto;
 		@apply px-2 py-1;
@@ -323,9 +327,10 @@
 		corner-shape: squircle;
 		border-radius: 9999px;
 
-		background: rgb(0 0 0 / 0.15);
+		background: var(--selection-highlight);
 		pointer-events: none;
 
+		position-visibility: anchors-valid;
 		position-anchor: --category-indicator;
 		left: anchor(center);
 		top: anchor(center);
@@ -334,6 +339,10 @@
 		transition:
 			left 160ms ease,
 			top 160ms ease;
+	}
+
+	.reaction-card-emoji-categories.searching::before {
+		display: none;
 	}
 
 	.reaction-card-emoji-category {
@@ -376,21 +385,20 @@
 	}
 
 	.reaction-card-emoji-option {
+		content-visibility: hidden;
 
 		@apply relative;
 
 		@apply w-10 aspect-square;
 
 
-		@apply bg-orange-50;
+		@apply bg-popover;
 		@apply rounded-full;
 
 		@apply border-2;
-		@apply border-orange-200;
-		@apply hover:border-white;
-		@apply hover:bg-sky-600;
-
-		@apply text-shadow-2xs text-shadow-black/30;
+		@apply border-secondary;
+		@apply hover:border-accent-foreground;
+		@apply hover:bg-accent;
 
 	}
 
@@ -399,25 +407,21 @@
 		@apply absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2;
 
 		@apply text-xl;
-		@apply text-shadow-black/30;
-		@apply text-shadow-md;
 
 		@apply group-hover:scale-150;
-		@apply group-hover:pb-4;
-		@apply group-hover:text-shadow-black/25;
-		@apply group-hover:text-shadow-lg;
-		@apply transition-all duration-300;
+		@apply group-hover:-translate-y-[calc(50%+0.5rem)];
+		@apply transition-transform duration-150;
 
 		@apply group-hover:animate-wiggle;
 
 		transform-origin: center;
-		will-change: scale, rotate, padding-bottom;
+		/* Let the browser promote only the hovered emoji, not the entire catalog. */
 
 	}
 
 	.reaction-card-emoji-note {
 		margin: 0;
-		color: black;
+		color: var(--foreground);
 		font-size: 0.75rem;
 	}
 

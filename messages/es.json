@@ -1,6 +1,7 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"hello_world": "Hello, {name} from es!",
+	"__meta_description": "Crea insignias de reacción con emojis y contadores en vivo para Markdown de GitHub, archivos README y otros documentos.",
 
 	"__tagline": "¡La forma más sencilla de agregar botones de reacción en línea a tu contenido Markdown!",
 

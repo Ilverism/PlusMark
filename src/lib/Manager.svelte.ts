@@ -1,6 +1,9 @@
 // src/lib/Manager.ts
 import Reaction from "../Reaction.svelte";
-import { buildMarkdownSnippet, createWidgetInput, slugifyContentId } from "$lib/widget";
+import { buildGroupContentId, buildMarkdownSnippet, createReactionGroupId, createWidgetInput, normalizeDocId, normalizeReturnUrl, slugifyContentId } from "$lib/widget";
+
+const BADGE_PREFERENCE_KEY = "plusmark:include-badge";
+const SOURCE_PREFERENCE_KEY = "plusmark:verify-referrer";
 
 export type EmojiPickerAnchorRect = {
 	top: number;
@@ -16,7 +19,18 @@ class Manager {
 	isGenerating: boolean = $state(false);
 	didStartGenerate: boolean = $state(false);
 	contentId: string = $state("");
+	reactionGroupId = $state("");
+	verifyReferrer = $state(true);
+	groupContentId = $derived(buildGroupContentId(this.contentId, this.reactionGroupId));
+	private preferencesLoaded = false;
+	private editTokens = new Map<string, string>();
 	returnUrl: string = $state("");
+	hasAttemptedGenerate = $state(false);
+	groupIdInvalid = $derived(this.hasAttemptedGenerate && Boolean(normalizeDocId(this.contentId)) && !this.groupContentId);
+	returnUrlInvalid = $derived(this.hasAttemptedGenerate && !normalizeReturnUrl(this.returnUrl));
+	contentIdInvalid = $derived(this.hasAttemptedGenerate && !normalizeDocId(this.contentId));
+	private contentIdEdited = false;
+	includePlusMarkBadge: boolean = $state(true);
 	error: string = $state("");
 	reactions: Reaction[] = $state([]);
 	reactionEmojiEditing: Reaction | null = $state(null);
@@ -51,8 +65,19 @@ class Manager {
 	});
 
 	constructor() {
-		// EXAMPLE REACTIONS [EX]
-		this.reactions.push(new Reaction());
+
+		// Initialize base reactions
+		const thumbsUp = new Reaction();
+		thumbsUp.emoji = "👍";
+		thumbsUp.name = "Thumbs Up";
+		thumbsUp.description = "I like this!";
+
+		const thumbsDown = new Reaction();
+		thumbsDown.emoji = "👎";
+		thumbsDown.name = "Thumbs Down";
+		thumbsDown.description = "I dislike this!";
+
+		this.reactions.push(thumbsUp, thumbsDown);
 
 	}
 
@@ -135,13 +160,85 @@ class Manager {
 		this.returnUrl = value;
 		this.markDirty();
 
-		if (this.contentId.trim().length === 0)
-			this.contentId = slugifyContentId(value);
+	}
+
+	fillContentIdFromUrl(fromPaste = false) {
+		if (!this.contentIdEdited || (fromPaste && !this.contentId.trim())) {
+			this.contentId = normalizeReturnUrl(this.returnUrl) ? slugifyContentId(this.returnUrl) : "";
+		}
 	}
 
 	setContentId(value: string) {
+		// Preserve manual edits; only a URL paste may refill an empty ID.
+		this.contentIdEdited = true;
 		this.contentId = value;
 		this.markDirty();
+	}
+
+	setReactionGroupId(value: string) {
+		this.reactionGroupId = value;
+		this.markDirty();
+	}
+
+	newReactionGroup() {
+		this.setReactionGroupId(createReactionGroupId());
+	}
+
+	setVerifyReferrer(value: boolean) {
+		this.verifyReferrer = value;
+		this.markDirty();
+		try {
+			localStorage.setItem(SOURCE_PREFERENCE_KEY, String(value));
+		} catch { /* The checkbox still works for this visit. */ }
+	}
+
+	loadPreferences() {
+		if (this.preferencesLoaded) return;
+		this.preferencesLoaded = true;
+		this.reactionGroupId = createReactionGroupId();
+		this.loadBadgePreference();
+		try {
+			// Preserve only the checkbox preference from the retired draft format.
+			const oldDraft = localStorage.getItem('plusmark:reaction-draft:v1');
+			if (localStorage.getItem(SOURCE_PREFERENCE_KEY) === null && oldDraft) {
+				try {
+					const draft = JSON.parse(oldDraft);
+					if (typeof draft?.verifyReferrer === 'boolean') {
+						localStorage.setItem(SOURCE_PREFERENCE_KEY, String(draft.verifyReferrer));
+					}
+				} catch { /* Ignore malformed retired drafts. */ }
+			}
+			localStorage.removeItem('plusmark:reaction-draft:v1');
+			this.verifyReferrer = localStorage.getItem(SOURCE_PREFERENCE_KEY) !== 'false';
+			// Retain existing edit access for this tab, without keeping tokens between sessions.
+			for (const key of Object.keys(localStorage)) {
+				if (!key.startsWith('plusmark:edit-token:')) continue;
+				const token = localStorage.getItem(key);
+				if (token) sessionStorage.setItem(key, token);
+				localStorage.removeItem(key);
+			}
+		} catch {
+			// Defaults and in-memory editing remain available when storage is blocked.
+		}
+	}
+
+	loadBadgePreference() {
+		try {
+			this.includePlusMarkBadge = localStorage.getItem(BADGE_PREFERENCE_KEY) !== "false";
+		} catch {
+			// Storage may be blocked; keep the default enabled for this visit.
+			this.includePlusMarkBadge = true;
+		}
+	}
+
+	setIncludePlusMarkBadge(value: boolean) {
+		this.includePlusMarkBadge = value;
+		this.markDirty();
+		try {
+			localStorage.setItem(BADGE_PREFERENCE_KEY, String(value));
+		} catch {
+			// The checkbox still works for this visit when persistence is unavailable.
+		}
 	}
 
 	markDirty() {
@@ -154,6 +251,12 @@ class Manager {
 	 * Begins the Markdown generation process for the current reactions.
 	 */
 	async generateStart(): Promise<string> {
+		this.fillContentIdFromUrl();
+		this.hasAttemptedGenerate = true;
+		if (!normalizeReturnUrl(this.returnUrl) || !this.groupContentId
+			|| this.reactions.some(reaction => !reaction.name.trim())) {
+			return "";
+		}
 
 		// Flag as having started generation
 		this.didStartGenerate = true;
@@ -164,7 +267,7 @@ class Manager {
 		this.error = "";
 
 		const widgetInput = createWidgetInput({
-			doc: this.contentId,
+			doc: this.groupContentId,
 			returnUrl: this.returnUrl,
 			reactions: this.reactions.map((reaction) => ({
 				emoji: reaction.emoji,
@@ -179,11 +282,13 @@ class Manager {
 			return "";
 		}
 
-		this.contentId = widgetInput.doc;
+		this.contentId = normalizeDocId(this.contentId) ?? this.contentId;
 		this.returnUrl = widgetInput.returnUrl;
+		this.reactionGroupId = this.reactionGroupId.trim().toLowerCase();
 
 		const editTokenStorageKey = `plusmark:edit-token:${widgetInput.doc}`;
-		const editToken = localStorage.getItem(editTokenStorageKey);
+		let editToken = this.editTokens.get(widgetInput.doc) ?? null;
+		try { editToken = sessionStorage.getItem(editTokenStorageKey) ?? editToken; } catch { /* Storage may be blocked. */ }
 
 		try {
 			const response = await fetch("/api/widgets", {
@@ -193,6 +298,7 @@ class Manager {
 				},
 				body: JSON.stringify({
 					...widgetInput,
+					verifyReferrer: this.verifyReferrer,
 					editToken
 				})
 			});
@@ -209,10 +315,11 @@ class Manager {
 			}
 
 			if (body.editToken) {
-				localStorage.setItem(editTokenStorageKey, body.editToken);
+				this.editTokens.set(widgetInput.doc, body.editToken);
+				try { sessionStorage.setItem(editTokenStorageKey, body.editToken); } catch { /* The generated badges still work. */ }
 			}
 
-			this.output = buildMarkdownSnippet(body.widget, window.location.origin);
+			this.output = buildMarkdownSnippet(body.widget, window.location.origin, this.includePlusMarkBadge);
 			return this.output;
 		} catch {
 			this.error = "Generation failed. Check that the Worker preview server is running.";

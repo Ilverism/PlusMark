@@ -1,8 +1,9 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"hello_world": "Hello, {name} from en!",
+	"__meta_description": "Create emoji reaction badges with live counts for GitHub Markdown, READMEs, and other documents.",
 
-	"__tagline": "The simplest way to add inline reaction buttons to your Markdown content!",
+	"__tagline": "A simple way to add inline reaction buttons to your Markdown content.",
 
 	"__instructions_header": "Instructions",
 	"__instructions_step_1": "Add your reactions and select their icons",
@@ -13,7 +14,7 @@
 	"__reaction_description_placeholder": "Description (optional)",
 
 	"__add_reaction_button": "Add Reaction",
-	"__generate_HTML_button": "Generate HTML",
+	"__generate_HTML_button": "Generate",
 
 	"__support": "Support"
 }

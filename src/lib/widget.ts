@@ -12,6 +12,7 @@ export type PublicWidgetReaction = WidgetReactionInput & {
 export type PublicWidget = {
 	doc: string;
 	returnUrl: string;
+	verifyReferrer: boolean;
 	reactions: PublicWidgetReaction[];
 	createdAt: number;
 	updatedAt: number;
@@ -35,6 +36,22 @@ export const MAX_LABEL_LENGTH = 80;
 export const MAX_DESCRIPTION_LENGTH = 240;
 export const MAX_RETURN_URL_LENGTH = 2048;
 export const MAX_REACTIONS = 24;
+export const MAX_GROUP_ID_LENGTH = 32;
+
+export function createReactionGroupId(): string {
+	return Array.from(crypto.getRandomValues(new Uint8Array(8)), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function buildGroupContentId(contentId: string, groupId: string): string | null {
+	const doc = normalizeDocId(contentId);
+	const group = groupId.trim().toLowerCase();
+	if (!doc) return null;
+	if (!group) return doc;
+	if (group.length > MAX_GROUP_ID_LENGTH || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(group)) return null;
+	const combined = `${doc}-g-${group}`;
+	// Never silently truncate a group into another group's identity.
+	return combined.length <= MAX_DOC_ID_LENGTH ? combined : null;
+}
 
 export function slugifyContentId(input: string): string {
 	return slugify(input, MAX_DOC_ID_LENGTH);
@@ -73,14 +90,14 @@ export function createWidgetInput(draft: WidgetDraft): {
 	reactions: WidgetReactionInput[];
 } | null {
 	const returnUrl = normalizeReturnUrl(draft.returnUrl);
-	const doc = normalizeDocId(draft.doc || draft.returnUrl);
+	const doc = normalizeDocId(draft.doc);
 
-	if (!doc || !returnUrl) return null;
+	if (!doc || !returnUrl || draft.reactions.some(reaction => !reaction.name.trim())) return null;
 
 	const usedIds = new Map<string, number>();
 	const reactions = draft.reactions
 		.map((reaction) => {
-			const label = reaction.name.trim().slice(0, MAX_LABEL_LENGTH) || reaction.emoji;
+			const label = reaction.name.trim().slice(0, MAX_LABEL_LENGTH);
 			const baseId = slugifyReactionId(label || reaction.emoji) || 'reaction';
 			const nextCount = (usedIds.get(baseId) ?? 0) + 1;
 			usedIds.set(baseId, nextCount);
@@ -108,7 +125,7 @@ export function createWidgetInput(draft: WidgetDraft): {
 
 export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnUrl'> & {
 	reactions: WidgetReactionInput[];
-}, origin: string): string {
+}, origin: string, includePlusMarkBadge = true): string {
 	const baseUrl = origin.replace(/\/$/, '');
 
 	return widget.reactions
@@ -121,6 +138,9 @@ export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnU
 
 			return `[![${reaction.emoji} ${label}](${badgeUrl})](${reactUrl})`;
 		})
+		.concat(includePlusMarkBadge
+			? [`[![PlusMark](${baseUrl}/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)`]
+			: [])
 		.join('\n\n');
 }
 

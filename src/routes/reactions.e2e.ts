@@ -54,6 +54,7 @@ test('creates, protects, badges, and toggles a reaction widget', async ({ reques
 
 	const badgeAfterClick = await request.get(`/badge?doc=${doc}&r=thumbs-up`);
 	expect(await badgeAfterClick.text()).toContain('👍 1');
+	expect(await badgeAfterClick.text()).toContain('filter="url(#emoji-shadow)"');
 	// Camo cached stale counts without an explicit zero TTL, despite no-cache/no-store.
 	expect(badgeAfterClick.headers()['cache-control']).toContain('max-age=0');
 
@@ -65,4 +66,59 @@ test('creates, protects, badges, and toggles a reaction widget', async ({ reques
 
 	const badgeAfterToggle = await request.get(`/badge?doc=${doc}&r=thumbs-up`);
 	expect(await badgeAfterToggle.text()).toContain('👍 0');
+});
+
+test('generated Markdown ends with a renderable linked PlusMark badge', async ({ page, request }) => {
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	await expect(page.getByRole('checkbox', { name: 'Include PlusMark badge' })).toBeChecked();
+	await page.getByLabel('Return URL', { exact: true }).fill('https://example.com/markdown-source');
+	await page.getByLabel('Content ID', { exact: true }).click();
+	await page.getByLabel('Content ID', { exact: true }).fill(`badge-output-${Date.now()}`);
+	await page.getByRole('button', { name: 'Generate', exact: true }).click();
+	const output = page.locator('.main-card-generated code');
+	await expect(output).toContainText('/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)');
+	const markdown = (await output.innerText()).trim();
+	expect(markdown.endsWith('/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)')).toBe(true);
+	const logo = await request.get('/PlusMark-badge.svg');
+	expect(logo.ok()).toBe(true);
+	expect(logo.headers()['content-type']).toContain('image/svg+xml');
+	const images = [...markdown.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(match => match[1]);
+	expect(images).toHaveLength(3);
+	await page.evaluate(urls => {
+		for (const url of urls) {
+			const image = document.createElement('img');
+			image.className = 'generated-badge-check';
+			image.src = url;
+			document.body.append(image);
+		}
+	}, images);
+	await expect.poll(() => page.locator('.generated-badge-check').evaluateAll(images =>
+		images.every(image => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalHeight === 24)
+	)).toBe(true);
+});
+
+test('remembers the logo preference and applies it to regenerated Markdown', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	const includeBadge = page.getByRole('checkbox', { name: 'Include PlusMark badge' });
+	await expect(includeBadge).toBeChecked();
+	await includeBadge.uncheck();
+	await page.reload();
+	await page.waitForLoadState('networkidle');
+	await expect(includeBadge).not.toBeChecked();
+	await page.getByLabel('Return URL', { exact: true }).fill('https://example.com/markdown-source');
+	await page.getByLabel('Content ID', { exact: true }).click();
+	await page.getByLabel('Content ID', { exact: true }).fill(`badge-preference-${Date.now()}`);
+	const generate = page.getByRole('button', { name: 'Generate', exact: true });
+	const output = page.locator('.main-card-generated code');
+	await generate.click();
+	await expect(output).toContainText('/badge?');
+	await expect(output).not.toContainText('PlusMark-badge.svg');
+	await includeBadge.check();
+	await generate.click();
+	await expect(output).toContainText('PlusMark-badge.svg');
+	await page.reload();
+	await page.waitForLoadState('networkidle');
+	await expect(includeBadge).toBeChecked();
 });

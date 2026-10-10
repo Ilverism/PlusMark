@@ -1,6 +1,8 @@
 import { error, json, type RequestEvent } from '@sveltejs/kit';
 import { dev } from '$app/environment';
+import { isReactionSourceAllowed, reactionSourceFailure } from './reaction-source';
 import type { ReactionDocument } from './reaction-document';
+import { advanceBadgePublication, badgeRefreshAt, type BadgePublication } from './badge-throttle';
 import {
 	MAX_DESCRIPTION_LENGTH,
 	MAX_LABEL_LENGTH,
@@ -20,6 +22,7 @@ export type ReactionDocumentStub = Pick<
 type WidgetPayload = {
 	doc: string;
 	returnUrl: string;
+	verifyReferrer?: boolean;
 	reactions: WidgetReactionInput[];
 	editToken: string | null;
 };
@@ -69,6 +72,9 @@ export function parseWidgetPayload(payload: unknown): WidgetPayload | JsonFailur
 
 	if (!doc) return json({ error: 'Content ID is required.' }, { status: 400 });
 	if (!returnUrl) return json({ error: 'Return URL must be a valid http(s) URL.' }, { status: 400 });
+	if (payload.verifyReferrer !== undefined && typeof payload.verifyReferrer !== 'boolean') {
+		return json({ error: 'Verify referrer must be a boolean.' }, { status: 400 });
+	}
 	if (!Array.isArray(payload.reactions) || payload.reactions.length === 0) {
 		return json({ error: 'At least one reaction is required.' }, { status: 400 });
 	}
@@ -103,6 +109,7 @@ export function parseWidgetPayload(payload: unknown): WidgetPayload | JsonFailur
 	return {
 		doc,
 		returnUrl,
+		verifyReferrer: payload.verifyReferrer as boolean | undefined,
 		reactions,
 		editToken
 	};
@@ -205,6 +212,7 @@ type DevRecord = {
 
 class DevReactionDocument implements ReactionDocumentStub {
 	private record: DevRecord | null = null;
+	private publications = new Map<string, BadgePublication>();
 
 	constructor(private readonly doc: string) {}
 
@@ -230,6 +238,9 @@ class DevReactionDocument implements ReactionDocumentStub {
 		for (const reactionId of votes.keys()) {
 			if (!nextReactionIds.has(reactionId)) votes.delete(reactionId);
 		}
+		for (const reactionId of this.publications.keys()) {
+			if (!nextReactionIds.has(reactionId)) this.publications.delete(reactionId);
+		}
 
 		this.record = {
 			editTokenHash: this.record?.editTokenHash ?? command.createEditTokenHash,
@@ -237,6 +248,7 @@ class DevReactionDocument implements ReactionDocumentStub {
 			widget: {
 				doc: command.widget.doc,
 				returnUrl: command.widget.returnUrl,
+				verifyReferrer: command.widget.verifyReferrer ?? this.record?.widget.verifyReferrer ?? false,
 				reactions: command.widget.reactions.map((reaction) => ({
 					...reaction,
 					count: previousCounts.get(reaction.id) ?? 0
@@ -275,14 +287,24 @@ class DevReactionDocument implements ReactionDocumentStub {
 			} satisfies DevFailure;
 		}
 
+		const previous = this.publications.get(reactionId) ?? null;
+		const publication = advanceBadgePublication(previous, reaction.count, Date.now(), false);
+		if (previous && badgeRefreshAt(previous) > 0 && badgeRefreshAt(previous) <= Date.now()) {
+			this.publications.set(reactionId, publication);
+		}
 		return {
 			ok: true as const,
-			reaction
+			reaction: { ...reaction, count: publication.published_count },
+			throttled: publication.throttled_until > 0,
+			refreshAt: badgeRefreshAt(publication)
 		};
 	}
 
-	async toggleReaction(reactionId: string, voterHash: string) {
+	async toggleReaction(reactionId: string, voterHash: string, referrer: string | null = null) {
 		if (!this.record) return this.unknownDocument();
+		if (this.record.widget.verifyReferrer && !isReactionSourceAllowed(this.record.widget.returnUrl, referrer)) {
+			return reactionSourceFailure(this.record.widget.returnUrl);
+		}
 
 		const reaction = this.record.widget.reactions.find((reaction) => reaction.id === reactionId);
 		if (!reaction) {
@@ -309,6 +331,9 @@ class DevReactionDocument implements ReactionDocumentStub {
 		}
 
 		this.record.widget.updatedAt = Date.now();
+		this.publications.set(reactionId, advanceBadgePublication(
+			this.publications.get(reactionId) ?? null, reaction.count, Date.now(), true
+		));
 
 		return {
 			ok: true as const,

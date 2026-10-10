@@ -1,4 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
+import { isReactionSourceAllowed, reactionSourceFailure } from './reaction-source';
+import { formatReactionCount } from '../reaction-count';
+import { advanceBadgePublication, badgeRefreshAt, type BadgePublication } from './badge-throttle';
 import type { PublicWidget, PublicWidgetReaction, WidgetReactionInput } from '$lib/widget';
 import {
 	discoverGitHubCamoTargets,
@@ -12,6 +15,7 @@ type SqlRow = Record<string, ArrayBuffer | string | number | null>;
 type WidgetRow = SqlRow & {
 	doc: string;
 	return_url: string;
+	verify_referrer: number;
 	edit_token_hash: string;
 	created_at: number;
 	updated_at: number;
@@ -57,6 +61,7 @@ type SaveWidgetCommand = {
 	widget: {
 		doc: string;
 		returnUrl: string;
+		verifyReferrer?: boolean;
 		reactions: WidgetReactionInput[];
 	};
 	editTokenHash: string | null;
@@ -67,6 +72,7 @@ type RpcFailure = {
 	ok: false;
 	status: number;
 	message: string;
+	returnUrl?: string;
 };
 
 type WidgetSuccess = {
@@ -78,6 +84,8 @@ type WidgetSuccess = {
 type BadgeSuccess = {
 	ok: true;
 	reaction: PublicWidgetReaction;
+	throttled: boolean;
+	refreshAt: number;
 };
 
 type ToggleSuccess = {
@@ -128,16 +136,18 @@ export class ReactionDocument extends DurableObject {
 
 			if (existing) {
 				this.ctx.storage.sql.exec(
-					'UPDATE widget SET return_url = ?, updated_at = ? WHERE doc = ?',
+					'UPDATE widget SET return_url = ?, verify_referrer = ?, updated_at = ? WHERE doc = ?',
 					command.widget.returnUrl,
+					Number(command.widget.verifyReferrer ?? Boolean(existing.verify_referrer)),
 					now,
 					command.widget.doc
 				);
 			} else {
 				this.ctx.storage.sql.exec(
-					'INSERT INTO widget (doc, return_url, edit_token_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+					'INSERT INTO widget (doc, return_url, verify_referrer, edit_token_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
 					command.widget.doc,
 					command.widget.returnUrl,
+					Number(command.widget.verifyReferrer ?? false),
 					command.createEditTokenHash,
 					now,
 					now
@@ -209,15 +219,22 @@ export class ReactionDocument extends DurableObject {
 			};
 		}
 
+		const publication = this.updateBadgePublication(reactionId, reaction.count, reaction.count, false);
+		if (publication.changed) await this.queueCamoPurge(widget.return_url, reactionId);
 		await this.maybeScheduleGitHubDiscoveryFromBadge(reactionId);
+		if (publication.state.throttled_until) await this.ensureAlarmScheduled();
 
 		return {
 			ok: true,
-			reaction
+			reaction: { ...reaction, count: publication.state.published_count },
+			throttled: publication.state.throttled_until > 0,
+			refreshAt: badgeRefreshAt(publication.state)
 		};
 	}
 
-	async toggleReaction(reactionId: string, voterHash: string): Promise<ToggleSuccess | RpcFailure> {
+	async toggleReaction(reactionId: string, voterHash: string, referrer: string | null = null): Promise<ToggleSuccess | RpcFailure> {
+		let badgeChanged = false;
+		let badgeThrottled = false;
 		const result = this.ctx.storage.transactionSync(() => {
 			const widget = this.getWidgetRow();
 			if (!widget) {
@@ -226,6 +243,10 @@ export class ReactionDocument extends DurableObject {
 					status: 404,
 					message: 'Unknown content ID.'
 				} satisfies RpcFailure;
+			}
+
+			if (widget.verify_referrer && !isReactionSourceAllowed(widget.return_url, referrer)) {
+				return reactionSourceFailure(widget.return_url);
 			}
 
 			const reaction = this.readReaction(reactionId);
@@ -280,6 +301,9 @@ export class ReactionDocument extends DurableObject {
 					.exec<{ count: number }>('SELECT count FROM counts WHERE reaction = ? LIMIT 1', reactionId)
 					.toArray()[0]?.count ?? 0
 			);
+			const publication = this.updateBadgePublication(reactionId, count, reaction.count ?? 0, true);
+			badgeChanged = publication.changed;
+			badgeThrottled = publication.state.throttled_until > 0;
 
 			return {
 				ok: true,
@@ -289,25 +313,72 @@ export class ReactionDocument extends DurableObject {
 			} satisfies ToggleSuccess;
 		});
 
-		if (result.ok) {
+		if (result.ok && badgeChanged) {
 			await this.queueCamoPurge(result.returnUrl, reactionId);
 		}
+		if (result.ok && badgeThrottled) await this.ensureAlarmScheduled();
 
 		return result;
 	}
 
 	async alarm(): Promise<void> {
 		this.initialize();
+		await this.publishDueBadges();
 		await this.runGitHubMaintenance();
+	}
+
+	private updateBadgePublication(reactionId: string, count: number, previousCount: number, isVote: boolean) {
+		const previous = this.ctx.storage.sql.exec<BadgePublication & SqlRow>(
+			'SELECT * FROM badge_publications WHERE reaction = ?', reactionId
+		).toArray()[0] ?? null;
+		const state = advanceBadgePublication(previous, count, Date.now(), isVote);
+		const previousDisplay = previous?.throttled_until ? previous.published_count : previousCount;
+		const changed = Boolean(previous?.throttled_until) !== Boolean(state.throttled_until)
+			|| formatReactionCount(previousDisplay) !== formatReactionCount(state.published_count);
+		// Reads of an unchanged snapshot need no storage write.
+		if (isVote || (previous && badgeRefreshAt(previous) > 0 && badgeRefreshAt(previous) <= Date.now())) {
+			this.ctx.storage.sql.exec(
+				`INSERT INTO badge_publications VALUES (?, ?, ?, ?, ?, ?)
+				ON CONFLICT(reaction) DO UPDATE SET window_started_at = excluded.window_started_at,
+				window_count = excluded.window_count, throttled_until = excluded.throttled_until,
+				published_count = excluded.published_count, next_publish_at = excluded.next_publish_at`,
+				reactionId, state.window_started_at, state.window_count, state.throttled_until,
+				state.published_count, state.next_publish_at
+			);
+		}
+		return { state, changed };
+	}
+
+	private async publishDueBadges() {
+		const due = this.ctx.storage.sql.exec<ReactionIdRow>(
+			`SELECT reaction AS id FROM badge_publications WHERE throttled_until > 0
+			AND (next_publish_at <= ? OR throttled_until <= ?)`, Date.now(), Date.now()
+		).toArray();
+		for (const { id } of due) {
+			const reaction = this.readReaction(id);
+			if (!reaction) continue;
+			const publication = this.updateBadgePublication(id, reaction.count, reaction.count, false);
+			if (publication.changed) {
+				const widget = this.getWidgetRow();
+				if (widget) await this.queueCamoPurge(widget.return_url, id);
+			}
+		}
 	}
 
 	private initialize() {
 		if (this.initialized) return;
 
 		const sql = this.ctx.storage.sql;
+		sql.exec(`CREATE TABLE IF NOT EXISTS badge_publications (
+			reaction TEXT PRIMARY KEY, window_started_at INTEGER NOT NULL, window_count INTEGER NOT NULL,
+			throttled_until INTEGER NOT NULL, published_count INTEGER NOT NULL, next_publish_at INTEGER NOT NULL
+		)`);
 		sql.exec(
 			'CREATE TABLE IF NOT EXISTS widget (doc TEXT PRIMARY KEY, return_url TEXT NOT NULL, edit_token_hash TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)'
 		);
+		if (!sql.exec<{ name: string }>('PRAGMA table_info(widget)').toArray().some(column => column.name === 'verify_referrer')) {
+			sql.exec('ALTER TABLE widget ADD COLUMN verify_referrer INTEGER NOT NULL DEFAULT 0');
+		}
 		sql.exec(
 			'CREATE TABLE IF NOT EXISTS reactions (id TEXT PRIMARY KEY, emoji TEXT NOT NULL, label TEXT NOT NULL, description TEXT NOT NULL DEFAULT \'\', sort_order INTEGER NOT NULL)'
 		);
@@ -358,6 +429,7 @@ export class ReactionDocument extends DurableObject {
 
 		this.ctx.storage.sql.exec(`DELETE FROM reactions WHERE id NOT IN (${placeholders})`, ...ids);
 		this.ctx.storage.sql.exec(`DELETE FROM counts WHERE reaction NOT IN (${placeholders})`, ...ids);
+		this.ctx.storage.sql.exec(`DELETE FROM badge_publications WHERE reaction NOT IN (${placeholders})`, ...ids);
 		this.ctx.storage.sql.exec(`DELETE FROM votes WHERE reaction NOT IN (${placeholders})`, ...ids);
 		this.ctx.storage.sql.exec(`DELETE FROM camo_targets WHERE reaction NOT IN (${placeholders})`, ...ids);
 		this.ctx.storage.sql.exec(`DELETE FROM pending_camo_purges WHERE reaction NOT IN (${placeholders})`, ...ids);
@@ -751,6 +823,11 @@ export class ReactionDocument extends DurableObject {
 	private getNextAlarmTime(): number | null {
 		const state = this.getGithubState();
 		const times: number[] = [];
+		const nextBadge = this.ctx.storage.sql.exec<{ next_at: number | null }>(
+			`SELECT MIN(MIN(next_publish_at, throttled_until)) AS next_at
+			FROM badge_publications WHERE throttled_until > 0`
+		).toArray()[0]?.next_at;
+		if (nextBadge) times.push(Number(nextBadge));
 
 		if (state?.next_discovery_at && state.next_discovery_at > 0) {
 			times.push(Number(state.next_discovery_at));
@@ -831,6 +908,7 @@ export class ReactionDocument extends DurableObject {
 		return {
 			doc: row.doc,
 			returnUrl: row.return_url,
+			verifyReferrer: Boolean(row.verify_referrer),
 			reactions,
 			createdAt: row.created_at,
 			updatedAt: row.updated_at

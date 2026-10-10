@@ -1,5 +1,52 @@
 import { expect, test } from '@playwright/test';
 
+test('automated probes do not create identities or add/remove votes', async ({ request }) => {
+	const doc = `automated-probes-${crypto.randomUUID()}`;
+	const returnUrl = 'https://example.com/markdown-source';
+	const created = await request.post('/api/widgets', {
+		data: { doc, returnUrl, verifyReferrer: true, reactions: [{ id: 'like', emoji: '👍', label: 'Like', description: '' }] }
+	});
+	expect(created.ok()).toBe(true);
+	const reactionUrl = `/react?doc=${doc}&r=like`;
+	const speculativeHeaders: Record<string, string>[] = [
+		{ 'Sec-Purpose': 'prefetch' },
+		{ 'Sec-Purpose': 'prefetch;prerender' },
+		{ Purpose: 'prefetch' },
+		{ 'X-Purpose': 'preview, prefetch' },
+		{ 'X-Moz': 'prefetch' },
+		{ Purpose: 'Prerender' }
+	];
+	const probes = [
+		{ method: 'HEAD', headers: {} },
+		...speculativeHeaders.map(headers => ({ method: 'GET', headers }))
+	];
+	for (const count of [0, 1]) {
+		for (const probe of probes) {
+			const response = await request.fetch(reactionUrl, { ...probe, maxRedirects: 0 });
+			expect(response.status()).toBe(204);
+			expect(await response.body()).toHaveLength(0);
+			expect(response.headers()['set-cookie']).toBeUndefined();
+			expect(response.headers().location).toBeUndefined();
+			expect(response.headers()['cache-control']).toContain('no-store');
+			expect(response.headers()['x-robots-tag']).toBe('noindex, nofollow');
+			expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain(`👍 ${count}`);
+		}
+		// The same visitor still adds/removes a vote through an ordinary link request.
+		const click = await request.get(reactionUrl, { maxRedirects: 0 });
+		expect(click.status()).toBe(302);
+		expect(click.headers().location).toBe(returnUrl);
+		expect(click.headers()['cache-control']).toContain('no-store');
+		expect(click.headers()['x-robots-tag']).toBe('noindex, nofollow');
+		expect(await (await request.get(`/badge?doc=${doc}&r=like`)).text()).toContain(`👍 ${1 - count}`);
+	}
+});
+
+test('crawler guidance excludes reaction links', async ({ request }) => {
+	const robots = await request.get('/robots.txt');
+	expect(robots.ok()).toBe(true);
+	expect(await robots.text()).toMatch(/^Disallow: \/react\s*$/m);
+});
+
 test('creates, protects, badges, and toggles a reaction widget', async ({ request }) => {
 	const doc = `playwright-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 	const returnUrl = 'https://example.com/markdown-source';

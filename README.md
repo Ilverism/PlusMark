@@ -58,6 +58,21 @@ production Durable Object against a populated legacy SQLite schema, including
 restart persistence. `src/routes/reaction-groups.e2e.ts` covers the form, API,
 fresh form state, checkbox preferences, separate counters, and real browser navigation.
 
+## Automated reaction requests
+
+`HEAD /react` and GET requests explicitly marked as `prefetch` or `prerender`
+in `Sec-Purpose`, `Purpose`, `X-Purpose`, or `X-Moz` return an empty 204 response.
+They do not create a voter cookie, change a vote, or redirect. Reaction responses
+use `Cache-Control: no-store` so a skipped request or voting redirect is not
+reused for a subsequent click. `robots.txt` disallows `/react`, and reaction
+responses include `X-Robots-Tag: noindex, nofollow` to discourage indexing.
+
+Ordinary clicks retain the existing add/remove behavior, including legacy badge
+URLs. These safeguards do not identify every bot: an unmarked GET can still
+vote, and crawlers can ignore robots directives. They do not remove earlier
+automated votes. `src/routes/reactions.e2e.ts` checks probes both before and after
+a real vote, as well as normal voting and the crawler directive.
+
 ## Badge appearance and counts
 
 Reaction badges add a subtle shadow behind the emoji. Counts below 1,000 remain

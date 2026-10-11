@@ -43,6 +43,7 @@
 				<ul class="instructions-steps list-disc!">
 					<li>Anyone can duplicate and use any generated reactions in any document. This can be partially mitigated by keeping <b>Reject votes from other URLs</b> enabled.</li>
 					<li>Reactions are vulnerable to being spammed. The same user using multiple browsers or devices can interact with the same reaction multiple times.</li>
+					<li>Existing protections are intended to guard against automated crawlers and bot activity, and may not be effective against targeted spam efforts.</li>
 				</ul>
 			</Accordion.Content>
 		</Accordion.Item>

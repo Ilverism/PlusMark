@@ -1,9 +1,74 @@
-:root { font-family: system-ui, sans-serif; color: #431407; background: #fff7ed; color-scheme: light dark; }
-body { margin: 0; min-height: 100svh; display: grid; place-items: center; }
-main { width: min(28rem, calc(100% - 4rem)); padding: 2rem; border-radius: 1rem; background: #ffedd5; }
+:root {
+	/* Match the theme roles in src/routes/layout.css using Tailwind's palette values. */
+	--background: oklch(95.4% 0.038 75.164); /* orange-100 */
+	--foreground: oklch(0.145 0 0);
+	--card: oklch(83.7% 0.128 66.29); /* orange-300 */
+	--secondary: oklch(90.1% 0.076 70.697); /* orange-200 */
+	--control: white;
+	--border: oklch(90.1% 0.076 70.697); /* orange-200 */
+	--accent: oklch(58.8% 0.158 241.966); /* sky-600 */
+	--accent-foreground: white;
+	--ring: var(--accent);
+	--surface-edge: var(--background);
+	--warm-shadow: oklch(40.8% 0.123 38.172); /* orange-900 */
+	font-family: system-ui, sans-serif;
+	color: var(--foreground);
+	background: var(--background);
+	color-scheme: light dark;
+}
+body { margin: 0; min-height: 100svh; display: grid; place-items: center; isolation: isolate; }
+.background-pattern {
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	overflow: hidden;
+	pointer-events: none;
+	filter: blur(2px);
+	opacity: 10%;
+}
+.background-pattern::before {
+	content: '';
+	/* Same horizontal repeat, angle, and speed as the main page. */
+	--stripe-repeat: calc(240px / 0.984807753);
+	position: absolute;
+	inset: 0 calc(-1 * var(--stripe-repeat)) 0 0;
+	background: repeating-linear-gradient(-80deg, var(--secondary), var(--secondary) 120px, var(--card) 120px, var(--card) 240px);
+	animation: slide-background 4s linear infinite;
+}
+@keyframes slide-background {
+	from { transform: translateX(calc(-1 * var(--stripe-repeat))); }
+	to { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.background-pattern::before { animation: none; }
+}
+main {
+	width: min(28rem, calc(100% - 4rem));
+	padding: 2rem;
+	border-radius: 1rem;
+	background: var(--card);
+	border-bottom: 4px solid var(--surface-edge);
+	filter: drop-shadow(0 9px 7px color-mix(in oklab, var(--warm-shadow) 15%, transparent));
+}
 h1 { font-size: 1.5rem; overflow-wrap: anywhere; }
 a { color: inherit; }
-button { padding: .65rem 1.25rem; border: 1px solid #9a3412; border-radius: .5rem; background: #fed7aa; color: #431407; font: inherit; cursor: pointer; }
+a:hover { color: var(--accent); }
+button { padding: .65rem 1.25rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--control); color: var(--foreground); font: inherit; cursor: pointer; }
+button:enabled:hover { background: var(--accent); color: var(--accent-foreground); }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 button:disabled { opacity: .6; cursor: default; }
 #challenge { margin-block: 1rem; }
-@media (prefers-color-scheme: dark) { :root { color: #ffedd5; background: #1c1410; } main { background: #302019; } }
+@media (prefers-color-scheme: dark) {
+	:root {
+		--background: oklch(14.5% 0 0); /* neutral-950 */
+		--foreground: oklch(98% 0.016 73.684); /* orange-50 */
+		--card: oklch(20.5% 0 0); /* neutral-900 */
+		--secondary: oklch(75% 0.183 55.934); /* orange-400 */
+		--control: oklch(26.9% 0 0); /* neutral-800 */
+		--border: oklch(75% 0.183 55.934); /* orange-400 */
+		--accent: oklch(50% 0.134 242.749); /* sky-700 */
+		--ring: oklch(74.6% 0.16 232.661); /* sky-400 */
+		--surface-edge: var(--secondary);
+		--warm-shadow: black;
+	}
+}

@@ -112,6 +112,13 @@ CSRF, replay protection, legacy data, and persisted production SQLite receipts.
 Browser tests cover the verification page, rejected tokens, retry handling, and
 read-only link visits. A real-widget browser check is also needed after deployment.
 
+For styling, open `/react/preview` on the Vite dev server (for example,
+`http://localhost:4000/react/preview`). Add `?verified=1` to preview the submitting
+message. Both use the real page markup and `static/reaction-verification.css`;
+refresh after edits. This static preview loads no Turnstile, creates no votes,
+and stays on screen. It requires no keys or saved reaction group and returns 404
+in production builds, including `pnpm preview`.
+
 ## Badge appearance and counts
 
 Reaction badges add a subtle shadow behind the emoji. Counts below 1,000 remain

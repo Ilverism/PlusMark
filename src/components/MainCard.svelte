@@ -192,7 +192,7 @@
 		</Field.Field>
 
 		<!-- Secondary Options -->
-		<Field.Group class="gap-0.5!">
+		<Field.Group class="gap-0.5! **:data-[slot='field-label']:before:content-['•'] **:before:opacity-25">
 
 			<!-- Check reaction source -->
 			<Field.Field class="gap-1">
@@ -224,8 +224,12 @@
 
 			<Field.Field orientation="vertical" class="gap-1">
 				<Field.Label for="formatting" class="text-base font-semibold">Formatting</Field.Label>
-				<NativeSelect.Root id="formatting" value={Manager.formatting} disabled={Manager.isGenerating}
-					onchange={(event) => Manager.setFormatting(event.currentTarget.value)}>
+				<NativeSelect.Root
+					id="formatting"
+					value={Manager.formatting}
+					disabled={Manager.isGenerating}
+					onchange={(event) => Manager.setFormatting(event.currentTarget.value)}
+				>
 					<NativeSelect.Option value="row">Row</NativeSelect.Option>
 					<NativeSelect.Option value="table-no-desc">Table (No descriptions)</NativeSelect.Option>
 					<NativeSelect.Option value="table-with-desc">Table (With descriptions)</NativeSelect.Option>

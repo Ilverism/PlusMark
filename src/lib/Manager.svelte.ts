@@ -250,7 +250,7 @@ class Manager {
 	}
 
 	setFormatting(value: string) {
-		if (value !== 'row' && value !== 'table-no-desc' && value !== 'table-with-desc') return;
+		if (value !== 'row' && value !== 'column' && value !== 'table-no-desc' && value !== 'table-with-desc') return;
 		this.formatting = value;
 		this.markDirty();
 	}

@@ -123,7 +123,7 @@ export function createWidgetInput(draft: WidgetDraft): {
 	};
 }
 
-export type MarkdownFormatting = 'row' | 'table-no-desc' | 'table-with-desc';
+export type MarkdownFormatting = 'row' | 'column' | 'table-no-desc' | 'table-with-desc';
 
 export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnUrl'> & {
 	reactions: WidgetReactionInput[];
@@ -147,6 +147,7 @@ export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnU
 			? [`[![PlusMark](${baseUrl}/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)`]
 			: []);
 	if (formatting === 'row') return badges.join(' ');
+	if (formatting === 'column') return badges.join('\n\n');
 
 	const headings = widget.reactions.map(reaction => escapeTableText(reaction.label));
 	const descriptions = widget.reactions.map(reaction => escapeTableText(reaction.description));

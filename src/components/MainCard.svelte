@@ -231,6 +231,7 @@
 					onchange={(event) => Manager.setFormatting(event.currentTarget.value)}
 				>
 					<NativeSelect.Option value="row">Row</NativeSelect.Option>
+					<NativeSelect.Option value="column">Column</NativeSelect.Option>
 					<NativeSelect.Option value="table-no-desc">Table (No descriptions)</NativeSelect.Option>
 					<NativeSelect.Option value="table-with-desc">Table (With descriptions)</NativeSelect.Option>
 				</NativeSelect.Root>

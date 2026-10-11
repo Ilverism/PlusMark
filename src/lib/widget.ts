@@ -123,12 +123,14 @@ export function createWidgetInput(draft: WidgetDraft): {
 	};
 }
 
+export type MarkdownFormatting = 'row' | 'table-no-desc' | 'table-with-desc';
+
 export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnUrl'> & {
 	reactions: WidgetReactionInput[];
-}, origin: string, includePlusMarkBadge = true, includeSourceBadge = false): string {
+}, origin: string, includePlusMarkBadge = true, includeSourceBadge = false, formatting: MarkdownFormatting = 'row'): string {
 	const baseUrl = origin.replace(/\/$/, '');
 
-	return widget.reactions
+	const badges = widget.reactions
 		.map((reaction) => {
 			const doc = encodeURIComponent(widget.doc);
 			const reactionId = encodeURIComponent(reaction.id);
@@ -143,8 +145,25 @@ export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnU
 			: [])
 		.concat(includePlusMarkBadge
 			? [`[![PlusMark](${baseUrl}/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)`]
-			: [])
-		.join(' ');
+			: []);
+	if (formatting === 'row') return badges.join(' ');
+
+	const headings = widget.reactions.map(reaction => escapeTableText(reaction.label));
+	const descriptions = widget.reactions.map(reaction => escapeTableText(reaction.description));
+	if (includeSourceBadge) { headings.push('Source'); descriptions.push(''); }
+	if (includePlusMarkBadge) { headings.push('PlusMark'); descriptions.push(''); }
+	const tableRow = (cells: string[]) => `| ${cells.join(' | ')} |`;
+	const rows = [
+		tableRow(headings),
+		tableRow(badges.map(() => ':---:')),
+		tableRow(badges.map(badge => badge.replace(/\|/g, '&#124;').replace(/\r\n?|\n/g, ' ')))
+	];
+	if (formatting === 'table-with-desc') rows.push(tableRow(descriptions));
+	return rows.join('\n');
+}
+
+function escapeTableText(input: string): string {
+	return input.replace(/[&<>\\`*_[\]{}|~]/g, char => `&#${char.charCodeAt(0)};`).replace(/\r\n?|\n/g, '<br>');
 }
 
 function slugify(input: string, maxLength: number): string {

@@ -1,6 +1,7 @@
 // src/lib/Manager.ts
 import Reaction from "../Reaction.svelte";
 import { buildGroupContentId, buildMarkdownSnippet, createReactionGroupId, createWidgetInput, normalizeDocId, normalizeReturnUrl, slugifyContentId } from "$lib/widget";
+import type { MarkdownFormatting } from "$lib/widget";
 
 const BADGE_PREFERENCE_KEY = "plusmark:include-badge";
 const SOURCE_PREFERENCE_KEY = "plusmark:verify-referrer";
@@ -32,6 +33,7 @@ class Manager {
 	private contentIdEdited = false;
 	includePlusMarkBadge: boolean = $state(true);
 	includeSourceBadge: boolean = $state(true);
+	formatting: MarkdownFormatting = $state('row');
 	error: string = $state("");
 	reactions: Reaction[] = $state([]);
 	reactionEmojiEditing: Reaction | null = $state(null);
@@ -247,6 +249,12 @@ class Manager {
 		this.markDirty();
 	}
 
+	setFormatting(value: string) {
+		if (value !== 'row' && value !== 'table-no-desc' && value !== 'table-with-desc') return;
+		this.formatting = value;
+		this.markDirty();
+	}
+
 	markDirty() {
 		this.didStartGenerate = false;
 		this.output = "";
@@ -325,7 +333,7 @@ class Manager {
 				try { sessionStorage.setItem(editTokenStorageKey, body.editToken); } catch { /* The generated badges still work. */ }
 			}
 
-			this.output = buildMarkdownSnippet(body.widget, window.location.origin, this.includePlusMarkBadge, this.includeSourceBadge);
+			this.output = buildMarkdownSnippet(body.widget, window.location.origin, this.includePlusMarkBadge, this.includeSourceBadge, this.formatting);
 			return this.output;
 		} catch {
 			this.error = "Generation failed. Check that the Worker preview server is running.";

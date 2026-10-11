@@ -5,6 +5,30 @@ import ts from 'typescript';
 import { formatReactionCount } from '../src/lib/reaction-count.ts';
 import { buildMarkdownSnippet } from '../src/lib/widget.ts';
 import * as marker from '../src/lib/server/destination-marker.ts';
+import { compile } from 'mdsvex';
+
+test('table formats preserve columns, optional badges, and literal descriptions', async () => {
+	const widget = { doc: 'table', returnUrl: 'https://example.com/a|b', reactions: [
+		{ id: 'like', emoji: '👍', label: 'Like | this', description: 'Good | great\n<script> & **literal**' },
+		{ id: 'fire', emoji: '🔥', label: 'Fire', description: '' }
+	] };
+	for (const source of [false, true]) for (const branding of [false, true]) {
+		const columns = 2 + Number(source) + Number(branding);
+		for (const format of ['table-no-desc', 'table-with-desc']) {
+			const markdown = buildMarkdownSnippet(widget, 'https://badges.example', branding, source, format);
+			assert.equal(markdown.split('\n').length, format === 'table-with-desc' ? 4 : 3);
+			const { code } = await compile(markdown);
+			assert.equal((code.match(/<th[ >]/g) ?? []).length, columns);
+			assert.equal((code.match(/<td[ >]/g) ?? []).length, columns * (format === 'table-with-desc' ? 2 : 1));
+			assert.equal((code.match(/<img\s/g) ?? []).length, columns);
+			assert.ok(!code.includes('<script>'));
+			if (format === 'table-with-desc') {
+				assert.ok(code.includes('<br>'));
+				assert.ok(!code.includes('<strong>literal</strong>'));
+			}
+		}
+	}
+});
 
 const routeSource = await readFile(new URL('../src/routes/badge/+server.ts', import.meta.url), 'utf8');
 const compiledRoute = ts.transpileModule(routeSource, {

@@ -6,6 +6,7 @@
 	import * as Field from "$lib/components/ui/field";
 	import { Input } from "$lib/components/ui/input";
 	import * as Tooltip from "$lib/components/ui/tooltip/index.js";
+	import * as NativeSelect from "$lib/components/ui/native-select/index.js";
 	import Manager from "$lib/Manager.svelte";
 	import { __generate_HTML_button } from "$lib/paraglide/messages";
 	import { normalizeReturnUrl, slugifyContentId } from "$lib/widget";
@@ -190,28 +191,48 @@
 			<p id="reaction-group-error" class="text-sm text-destructive" role="alert">{Manager.groupIdInvalid ? 'Use up to 32 letters, numbers, or single separating dashes. Shorten the Content ID so the combined ID fits within 120 characters.' : ''}</p>
 		</Field.Field>
 
-		<!-- Check reaction source -->
-		<Field.Field class="gap-1">
-			<div class="flex items-center gap-2">
-				<Field.Label for="verify-referrer" class="text-base font-semibold">Reject votes from other URLs</Field.Label>
-				<Checkbox id="verify-referrer" checked={Manager.verifyReferrer} aria-describedby="verify-referrer-help"
-					onCheckedChange={(checked) => Manager.setVerifyReferrer(checked)} />
-			</div>
-		</Field.Field>
+		<!-- Secondary Options -->
+		<Field.Group class="gap-0.5!">
 
-		<!-- Include source badge -->
-		<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
-			<Field.Label for="include-source-badge" class="text-base font-semibold">Include source badge</Field.Label>
-			<Checkbox id="include-source-badge" checked={Manager.includeSourceBadge}
-				onCheckedChange={(checked) => Manager.setIncludeSourceBadge(checked)} />
-		</Field.Field>
+			<!-- Check reaction source -->
+			<Field.Field class="gap-1">
+				<div class="flex items-center gap-2">
+					<Field.Label for="verify-referrer" class="text-base font-semibold">Reject votes from other URLs</Field.Label>
+					<Checkbox id="verify-referrer" checked={Manager.verifyReferrer} aria-describedby="verify-referrer-help"
+						onCheckedChange={(checked) => Manager.setVerifyReferrer(checked)} />
+				</div>
+			</Field.Field>
 
-		<!-- Include PlusMark badge -->
-		<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
-			<Field.Label for="include-badge" class="text-base font-semibold">Include PlusMark badge</Field.Label>
-			<Checkbox id="include-badge" checked={Manager.includePlusMarkBadge}
-				onCheckedChange={(checked) => Manager.setIncludePlusMarkBadge(checked)} />
-		</Field.Field>
+			<!-- Include source badge -->
+			<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
+				<Field.Label for="include-source-badge" class="text-base font-semibold">Include source badge</Field.Label>
+				<Checkbox id="include-source-badge" checked={Manager.includeSourceBadge}
+					onCheckedChange={(checked) => Manager.setIncludeSourceBadge(checked)} />
+			</Field.Field>
+
+			<!-- Include PlusMark badge -->
+			<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
+				<Field.Label for="include-badge" class="text-base font-semibold">Include PlusMark badge</Field.Label>
+				<Checkbox id="include-badge" checked={Manager.includePlusMarkBadge}
+					onCheckedChange={(checked) => Manager.setIncludePlusMarkBadge(checked)} />
+			</Field.Field>
+
+		</Field.Group>
+
+		<!-- Formatting Options -->
+		<Field.Group class="gap-1!">
+
+			<Field.Field orientation="vertical" class="gap-1">
+				<Field.Label for="formatting" class="text-base font-semibold">Formatting</Field.Label>
+				<NativeSelect.Root id="formatting" value={Manager.formatting} disabled={Manager.isGenerating}
+					onchange={(event) => Manager.setFormatting(event.currentTarget.value)}>
+					<NativeSelect.Option value="row">Row</NativeSelect.Option>
+					<NativeSelect.Option value="table-no-desc">Table (No descriptions)</NativeSelect.Option>
+					<NativeSelect.Option value="table-with-desc">Table (With descriptions)</NativeSelect.Option>
+				</NativeSelect.Root>
+			</Field.Field>
+
+		</Field.Group>
 
 	</Field.Group>
 

@@ -116,6 +116,32 @@ test('source badges identify the saved destination, match reaction dots, and ren
 	await expect.poll(() => page.locator('#source-badge-check').evaluate(img => (img as HTMLImageElement).naturalHeight)).toBe(24);
 });
 
+test('formatting selects row or tables, copies newlines, and resets on reload', async ({ page, context }) => {
+	await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	const formatting = page.getByLabel('Formatting', { exact: true });
+	await expect(formatting).toHaveValue('row');
+	await page.locator('#return-url').fill('https://example.test/table');
+	await page.locator('#content-id').fill(`formatting-${Date.now()}`);
+	for (const [format, lines] of [['table-no-desc', 3], ['table-with-desc', 4], ['row', 1]] as const) {
+		await formatting.selectOption(format);
+		await page.getByRole('button', { name: 'Generate', exact: true }).click();
+		const output = page.locator('.main-card-generated-code');
+		await expect(output).toContainText('/badge?doc=');
+		const text = (await output.textContent())!.trim();
+		expect(text.split('\n')).toHaveLength(lines);
+		if (format !== 'row') expect(text.split('\n')[0]).toBe('| Thumbs Up | Thumbs Down | Source | PlusMark |');
+		if (format === 'table-with-desc') expect(text.split('\n')[3]).toBe('| I like this! | I dislike this! |  |  |');
+		await page.getByRole('button', { name: 'Copy', exact: true }).click();
+		await expect(page.getByRole('status')).toContainText('Copied!');
+		expect((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n')).toBe(text);
+	}
+	await formatting.selectOption('table-with-desc');
+	await page.reload();
+	await expect(formatting).toHaveValue('row');
+});
+
 test('source badge defaults on and can be omitted from generated output', async ({ page }) => {
 	await page.goto('/');
 	await page.waitForLoadState('networkidle');

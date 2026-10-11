@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { DocumentStatistics } from './document-statistics';
 import { isReactionSourceAllowed, reactionSourceFailure } from './reaction-source';
 import { formatReactionCount } from '../reaction-count';
 import { advanceBadgePublication, badgeRefreshAt, type BadgePublication } from './badge-throttle';
@@ -112,12 +113,14 @@ const PURGE_WINDOW_LIMIT = 8;
 const PURGE_BATCH_LIMIT = 4;
 const PURGE_BATCH_SPACING_MS = 60_000;
 
-export class ReactionDocument extends DurableObject {
+export class ReactionDocument extends DurableObject<Env> {
 	private initialized = false;
+	private statistics: DocumentStatistics;
 
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
 		this.initialize();
+		this.statistics = new DocumentStatistics(ctx.storage);
 	}
 
 	async saveWidget(command: SaveWidgetCommand): Promise<WidgetSuccess | RpcFailure> {
@@ -155,6 +158,7 @@ export class ReactionDocument extends DurableObject {
 				);
 			}
 
+			this.statistics.recordReactions(command.widget.reactions.map(reaction => reaction.id));
 			this.replaceReactions(command.widget.reactions);
 
 			return {
@@ -175,6 +179,7 @@ export class ReactionDocument extends DurableObject {
 		}
 
 		await this.syncGitHubStateAfterWidgetSave();
+		await this.ensureAlarmScheduled();
 
 		return {
 			ok: true,
@@ -236,7 +241,6 @@ export class ReactionDocument extends DurableObject {
 
 	async toggleReaction(reactionId: string, voterHash: string, referrer: string | null = null, submission?: { id: string; expiresAt: number }): Promise<ToggleSuccess | RpcFailure> {
 		let badgeChanged = false;
-		let badgeThrottled = false;
 		const result = this.ctx.storage.transactionSync(() => {
 			// Receipt and vote commit together, including concurrent retries and object restarts.
 			if (submission) {
@@ -316,7 +320,6 @@ export class ReactionDocument extends DurableObject {
 			);
 			const publication = this.updateBadgePublication(reactionId, count, reaction.count ?? 0, true);
 			badgeChanged = publication.changed;
-			badgeThrottled = publication.state.throttled_until > 0;
 
 			const receipt = {
 				ok: true,
@@ -328,19 +331,21 @@ export class ReactionDocument extends DurableObject {
 				'INSERT INTO reaction_submissions (id, voter, reaction, result, expires_at) VALUES (?, ?, ?, ?, ?)',
 				submission.id, voterHash, reactionId, JSON.stringify(receipt), submission.expiresAt
 			);
+			this.statistics.recordVote();
 			return receipt;
 		});
 
 		if (result.ok && badgeChanged) {
 			await this.queueCamoPurge(result.returnUrl, reactionId);
 		}
-		if (result.ok && badgeThrottled) await this.ensureAlarmScheduled();
+		if (result.ok) await this.ensureAlarmScheduled();
 
 		return result;
 	}
 
 	async alarm(): Promise<void> {
 		this.initialize();
+		await this.statistics.flush(this.ctx.id.toString(), this.env.SERVICE_STATISTICS);
 		await this.publishDueBadges();
 		await this.runGitHubMaintenance();
 	}
@@ -843,6 +848,8 @@ export class ReactionDocument extends DurableObject {
 	private getNextAlarmTime(): number | null {
 		const state = this.getGithubState();
 		const times: number[] = [];
+		const nextStatistics = this.statistics.snapshot.next_sync_at;
+		if (nextStatistics) times.push(nextStatistics);
 		const nextBadge = this.ctx.storage.sql.exec<{ next_at: number | null }>(
 			`SELECT MIN(MIN(next_publish_at, throttled_until)) AS next_at
 			FROM badge_publications WHERE throttled_until > 0`

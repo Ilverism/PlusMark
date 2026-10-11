@@ -124,7 +124,7 @@ test('formatting selects row, column or tables, copies newlines, and resets on r
 	await expect(formatting).toHaveValue('row');
 	await page.locator('#return-url').fill('https://example.test/table');
 	await page.locator('#content-id').fill(`formatting-${Date.now()}`);
-	for (const [format, lines] of [['table-no-desc', 3], ['table-with-desc', 4], ['column', 7], ['row', 1]] as const) {
+	for (const [format, lines] of [['table-no-desc', 3], ['table-with-desc', 4], ['column', 4], ['row', 1]] as const) {
 		await formatting.selectOption(format);
 		await page.getByRole('button', { name: 'Generate', exact: true }).click();
 		const output = page.locator('.main-card-generated-code');

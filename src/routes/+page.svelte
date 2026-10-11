@@ -13,26 +13,35 @@
     import ReactionCard from "../components/ReactionCard.svelte";
     import TextButton from "../components/TextButton.svelte";
     import ThemeToggle from "../components/ThemeToggle.svelte";
+    import ServiceStatistics from "../components/ServiceStatistics.svelte";
+    import M from "$lib/Manager.svelte";
+    import { fly } from "svelte/transition";
 </script>
 
 <svelte:head>
 	<meta name="description" content={__meta_description()} />
 </svelte:head>
 
-<div class="page-body noto-sans w-full">
+<div class="page-body noto-sans w-full pt-28 lg:pt-0">
+
+	<!-- Service Statistics -->
+	<ServiceStatistics />
 
 	<!-- Instructions -->
 	<Instructions />
-	<!-- <UsageWarnings /> -->
 
 	<div class="page-content">
 
 		<!-- Header & Tagline -->
-		<div>
-			<h2 class="ml-4 underline decoration-dotted decoration-1 underline-offset-8">PlusMark</h2>
-			<p class="text-foreground mt-4 px-4">
-				{__tagline()}
-			</p>
+		<div class="min-w-2xl min-h-58">
+			{#if M.reactions.length <= 3}
+				<div transition:fly={{duration: 400, easing: cubicOut, x: -400, y: 0}} class="page-header">
+					<h2 class="ml-4 underline decoration-dotted decoration-1 underline-offset-8">PlusMark</h2>
+					<p class="text-foreground mt-4 px-4">
+						{__tagline()}
+					</p>
+				</div>
+			{/if}
 		</div>
 
 		<div class="page-content-inner">
@@ -43,13 +52,15 @@
 			<!-- Reaction Items -->
 			<div class="reaction-items" class:reaction-items-disabled={Manager.isGenerating}>
 
-				{#each Manager.reactions as reaction (reaction.uuid)}
-					<div animate:flip={{duration: 300, easing: cubicOut}}>
-						<ReactionCard {reaction} />
-					</div>
-				{:else}
-					<p>No reactions yet!</p>
-				{/each}
+				<div class="reaction-items-list">
+					{#each Manager.reactions as reaction (reaction.uuid)}
+						<div animate:flip={{duration: 300, easing: cubicOut}}>
+							<ReactionCard {reaction} />
+						</div>
+					{:else}
+						<p>No reactions yet!</p>
+					{/each}
+				</div>
 
 				<!-- Add Reaction Button -->
 				<ReactionAddButton />
@@ -73,7 +84,7 @@
 			<span class="text-foreground text-base font-black group-hover:underline">PlusMark</span>
 
 			<!-- Not Hovering -> Show Version & Date -->
-			<span class="text-xs text-foreground font-light group-hover:hidden">ver. 2026-05.23 (Beta)</span>
+			<span class="text-xs text-foreground font-light group-hover:hidden">ver. 2026-10.11 (Beta)</span>
 			<span class="text-xs text-foreground font-light not-group-hover:hidden flex gap-1 items-center">
 				<ExternalLink  size={16}/>
 				Open in GitHub</span>
@@ -124,6 +135,22 @@
 		@apply flex flex-col items-center gap-4;
 
 		@apply transition-all duration-400;
+	}
+	.reaction-items-list {
+
+		@apply flex-1;
+
+		@apply flex flex-col items-center gap-4;
+
+		@apply scroll-fade;
+
+		@apply max-h-[50dvh];
+		@apply h-[50dvh];
+		@apply overflow-y-auto;
+		@apply overflow-x-clip;
+		@apply p-32;
+		@apply -m-32;
+
 	}
 
 	.reaction-items-disabled {

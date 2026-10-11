@@ -14,15 +14,19 @@ const source = await readFile(new URL('../src/lib/server/reaction-document.ts', 
 const compiled = ts.transpileModule(source, {
 	compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
 }).outputText;
+const statisticsExports = {};
+new Function('exports', ts.transpileModule(await readFile(new URL('../src/lib/server/document-statistics.ts', import.meta.url), 'utf8'), {
+	compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+}).outputText)(statisticsExports);
 
 async function fixture(t, purge) {
 	const db = new DatabaseSync(':memory:');
 	t.after(() => db.close());
 	let alarm = null;
-	const ctx = { storage: {
+	const ctx = { id: { toString: () => 'test' }, storage: {
 		sql: { exec: (sql, ...args) => {
 			const rows = db.prepare(sql).all(...args);
-			return { toArray: () => rows };
+			return { toArray: () => rows, one: () => { assert.equal(rows.length, 1); return rows[0]; } };
 		} },
 		transactionSync: callback => callback(),
 		getAlarm: async () => alarm,
@@ -32,8 +36,9 @@ async function fixture(t, purge) {
 	const exports = {};
 	new Function('require', 'exports', compiled)(name => {
 		if (name === 'cloudflare:workers') return { DurableObject: class {
-			constructor(state) { this.ctx = state; }
+			constructor(state) { this.ctx = state; this.env = { SERVICE_STATISTICS: { getByName: () => ({ record: async () => {} }) } }; }
 		} };
+		if (name === './document-statistics') return statisticsExports;
 		if (name === './github-camo') return { ...camo, purgeCamoUrl: purge };
 		if (name === '../reaction-count') return counts;
 		if (name === './badge-throttle') return throttle;

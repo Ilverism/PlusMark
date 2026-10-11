@@ -1,5 +1,6 @@
 import { error, json, type RequestEvent } from '@sveltejs/kit';
 import { dev } from '$app/environment';
+import { devStatistics } from './dev-statistics';
 import { isReactionSourceAllowed, reactionSourceFailure } from './reaction-source';
 import type { ReactionDocument } from './reaction-document';
 import { advanceBadgePublication, badgeRefreshAt, type BadgePublication } from './badge-throttle';
@@ -214,6 +215,7 @@ type DevRecord = {
 };
 
 class DevReactionDocument implements ReactionDocumentStub {
+	private generatedReactions = new Set<string>();
 	private submissions = new Map<string, { expiresAt: number; voter: string; reaction: string; result: { ok: true; count: number; active: boolean; returnUrl: string } }>();
 	private record: DevRecord | null = null;
 	private publications = new Map<string, BadgePublication>();
@@ -233,6 +235,12 @@ class DevReactionDocument implements ReactionDocumentStub {
 			} satisfies DevFailure;
 		}
 
+		for (const reaction of command.widget.reactions) {
+			if (!this.generatedReactions.has(reaction.id)) {
+				this.generatedReactions.add(reaction.id);
+				devStatistics.reactions++;
+			}
+		}
 		const previousCounts = new Map(
 			this.record?.widget.reactions.map((reaction) => [reaction.id, reaction.count]) ?? []
 		);
@@ -354,6 +362,7 @@ class DevReactionDocument implements ReactionDocumentStub {
 			returnUrl: this.record.widget.returnUrl
 		};
 		if (submission) this.submissions.set(submission.id, { ...submission, voter: voterHash, reaction: reactionId, result });
+		devStatistics.votes++;
 		return result;
 	}
 

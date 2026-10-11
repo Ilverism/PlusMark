@@ -2,6 +2,14 @@
 
 # sv
 
+## Service statistics
+
+The homepage shows **Reactions Generated / Votes Submitted**, tracked from deployment of the statistics feature. A distinct reaction ID within a group counts once, even if removed and re-added. Regeneration, image requests, source badges, and branding badges do not count. Accepted votes and removals count as submissions; rejected requests and retries of the same submission do not. Existing badges and historical votes are not backfilled.
+
+Production counters persist in SQLite Durable Objects. Each group records counters alongside the corresponding mutation, then sends cumulative snapshots through its alarm scheduler, batched for 60 seconds. Duplicate or older snapshots are ignored. Failed deliveries retry after five minutes without blocking voting. The read-only `/api/statistics` response is cached for 60 seconds; the homepage refreshes once a minute while visible, so normal display lag can be a few minutes. Local Vite totals use the development in-memory store and reset with the server.
+
+Deployment requires the `v2_service_statistics` migration and `SERVICE_STATISTICS` binding in `wrangler.jsonc`; the build exports the new Durable Object automatically. No additional secret is required.
+
 ## Reaction groups and source checks
 
 The generator creates a random 16-character reaction group ID (64 random bits).

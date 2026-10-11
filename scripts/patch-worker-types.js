@@ -9,7 +9,7 @@ const patched = source
 		'mainModule: unknown;'
 	)
 	.replace(
-		/DurableObjectNamespace<import\(".*?_worker"\)\.ReactionDocument>/g,
+		/DurableObjectNamespace<import\(".*?_worker"\)\.(?:ReactionDocument|ServiceStatistics)>/g,
 		'DurableObjectNamespace'
 	);
 

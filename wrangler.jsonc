@@ -19,6 +19,10 @@
 			{
 				"name": "REACTION_DOCUMENTS",
 				"class_name": "ReactionDocument"
+			},
+			{
+				"name": "SERVICE_STATISTICS",
+				"class_name": "ServiceStatistics"
 			}
 		]
 	},
@@ -28,6 +32,10 @@
 			"new_sqlite_classes": [
 				"ReactionDocument"
 			]
+		},
+		{
+			"tag": "v2_service_statistics",
+			"new_sqlite_classes": ["ServiceStatistics"]
 		}
 	],
 	"workers_dev": true,

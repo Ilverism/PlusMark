@@ -13,7 +13,10 @@ const dispatch = `export default {async fetch(request,env) {
  return Response.json(await stub[action](...args));
 }};`;
 const bundle = await build({
-	stdin: { contents: `export { ReactionDocument } from './src/lib/server/reaction-document.ts';\n${dispatch}`, resolveDir: root, loader: 'ts' },
+	stdin: { contents: `import { ReactionDocument as BaseDocument } from './src/lib/server/reaction-document.ts';
+export class ReactionDocument extends BaseDocument {
+ getStatistics() { return this.ctx.storage.sql.exec('SELECT reactions, votes FROM statistics').one(); }
+}\n${dispatch}`, resolveDir: root, loader: 'ts' },
 	bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', external: ['cloudflare:workers']
 });
 // Start with a populated pre-change database, then restart the same objects with the new code.
@@ -49,9 +52,11 @@ try {
 	let legacyWidget = await rpc('legacy', 'getWidget');
 	assert.equal(legacyWidget.widget.verifyReferrer, false);
 	assert.equal(legacyWidget.widget.reactions[0].count, 1);
+	assert.deepEqual(await rpc('legacy', 'getStatistics'), { reactions: 0, votes: 0 }, 'historical activity is not backfilled');
 	assert.equal((await rpc('legacy', 'toggleReaction', 'like', 'existing-voter', 'https://other.example/')).count, 0);
 	assert.equal((await save('legacy', true, 'wrong')).ok, false);
 	assert.equal((await save('legacy', true, 'secret')).ok, true);
+	assert.deepEqual(await rpc('legacy', 'getStatistics'), { reactions: 0, votes: 1 }, 'legacy badge regeneration does not count as creation');
 	assert.equal((await rpc('legacy', 'toggleReaction', 'like', 'new', 'https://other.example/')).status, 403);
 	await save('legacy', undefined, 'secret');
 	assert.equal((await rpc('legacy', 'getWidget')).widget.verifyReferrer, true, 'old clients must not disable an existing guard');

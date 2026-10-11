@@ -129,7 +129,7 @@ test('badge responses are identical within a display range and escape SVG conten
 	assert.match(first.headers.get('cache-control'), /max-age=0/);
 	const svg = await first.text();
 	assert.equal(svg, await (await renderBadge(2388)).text());
-	assert.match(svg, /<text x="34" y="16">2\.3k<\/text>/);
+	assert.match(svg, /<text x="29" y="17">2\.3k<\/text>/);
 	assert.match(svg, /<text[^>]+filter="url\(#emoji-shadow\)"/);
 	assert.match(await (await renderBadge(1323521)).text(), />1\.3m<\/text>/);
 	const escaped = await (await renderBadge(1, '<&', '"<unsafe>')).text();

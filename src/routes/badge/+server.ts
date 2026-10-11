@@ -51,7 +51,7 @@ export const GET: RequestHandler = async (event) => {
 
 function svgBadgeResponse(emoji: string, text: string, status: number, label = 'PlusMark reaction', throttled = false, colors?: [string, string], returnUrl = ''): Response {
 	const display = `${emoji} ${text}`;
-	const contentWidth = Math.max(72, Math.min(260, 30 + Array.from(display).length * 9));
+	const contentWidth = Math.max(54, Math.min(260, 36 + Array.from(text).length * 9));
 	const markerWidth = colors ? 16 : 0;
 	const width = contentWidth + (throttled ? 16 : 0) + markerWidth;
 	const escapedDisplay = escapeXml(display);
@@ -63,18 +63,18 @@ function svgBadgeResponse(emoji: string, text: string, status: number, label = '
 		`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="24" role="img" aria-label="${escapedLabel} ${escapedDisplay}${delayNote}${sourceNote}">
 <title>${escapedLabel} ${escapedDisplay}${delayNote}${sourceNote}</title>
 <defs>
-  <clipPath id="emoji-slot"><rect x="8" y="0" width="24" height="24"/></clipPath>
-  <clipPath id="count-slot"><rect x="34" y="0" width="${contentWidth - 40}" height="24"/></clipPath>
+  <clipPath id="emoji-slot"><rect x="3" y="0" width="24" height="24"/></clipPath>
+  <clipPath id="count-slot"><rect x="29" y="0" width="${contentWidth - 35}" height="24"/></clipPath>
   <filter id="emoji-shadow" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
     <feDropShadow dx="0" dy="0.6" stdDeviation="0.7" flood-color="#000" flood-opacity="0.3"/>
   </filter>
 </defs>
 <rect width="${width}" height="24" rx="12" fill="#f3f4f6"/>
 <g font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" fill="#111827">
-  <g clip-path="url(#emoji-slot)"><text x="12" y="16" filter="url(#emoji-shadow)">${escapeXml(emoji)}</text></g>
-  <g clip-path="url(#count-slot)"><text x="34" y="16">${escapeXml(text)}</text></g>
+  <g clip-path="url(#emoji-slot)"><text x="7" y="17" filter="url(#emoji-shadow)">${escapeXml(emoji)}</text></g>
+  <g clip-path="url(#count-slot)"><text x="29" y="17">${escapeXml(text)}</text></g>
 </g>
-${colors ? destinationDot(colors, width - 10) : ''}
+${colors ? destinationDot(colors, width - 12) : ''}
 ${throttled ? `<g data-throttled="true" transform="translate(${width - markerWidth - 15} 6)" fill="none" stroke="#9ca3af" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M1 0h8M1 12h8M2 0v2c0 2 6 6 6 8v2M8 0v2c0 2-6 6-6 8v2"/>
   <path d="M3 10h4"/>

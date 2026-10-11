@@ -83,7 +83,7 @@ test('destination markers are stable, use the saved URL, and distinguish fragmen
 test('source badge is optional, inline, before branding, and links directly to the return URL', () => {
 	const widget = { doc: 'example', returnUrl: 'https://example.com/a_(b)?x=1&y=2#section', reactions: [{ id: 'like', emoji: '👍', label: 'Like', description: '' }] };
 	const markdown = buildMarkdownSnippet(widget, 'https://badges.example', true, true);
-	assert.ok(markdown.includes('/source-badge?doc=example)](<https://example.com/a_(b)?x=1&y=2#section>)'));
+	assert.ok(markdown.includes('/source-badge?doc=example&v=2)](<https://example.com/a_(b)?x=1&y=2#section>)'));
 	assert.ok(markdown.indexOf('/source-badge?') < markdown.indexOf('/PlusMark-badge.svg'));
 	assert.ok(!/[\r\n]/.test(markdown));
 	assert.ok(!buildMarkdownSnippet(widget, 'https://badges.example', true, false).includes('/source-badge?'));

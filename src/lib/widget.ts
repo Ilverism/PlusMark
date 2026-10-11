@@ -134,7 +134,7 @@ export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnU
 }, origin: string, includePlusMarkBadge = true, includeSourceBadge = false, formatting: MarkdownFormatting = 'row'): string {
 	const baseUrl = origin.replace(/\/$/, '');
 
-	// Source images have no vote-driven purges; vary their URL when regenerating with a new theme.
+	// Source images have no vote-driven purges; version rendering changes and theme changes in the URL.
 	const badges = widget.reactions
 		.map((reaction) => {
 			const doc = encodeURIComponent(widget.doc);
@@ -146,7 +146,7 @@ export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnU
 			return `[![${reaction.emoji} ${label}](${badgeUrl})](${reactUrl})`;
 		})
 		.concat(includeSourceBadge
-			? [`[![Source: ${escapeMarkdownAlt(widget.returnUrl)}](${baseUrl}/source-badge?doc=${encodeURIComponent(widget.doc)}${widget.badgeTheme ? `&theme=${widget.badgeTheme}` : ''})](<${widget.returnUrl.replace(/</g, '%3C').replace(/>/g, '%3E')}>)`]
+			? [`[![Source: ${escapeMarkdownAlt(widget.returnUrl)}](${baseUrl}/source-badge?doc=${encodeURIComponent(widget.doc)}${widget.badgeTheme ? `&theme=${widget.badgeTheme}` : ''}&v=2)](<${widget.returnUrl.replace(/</g, '%3C').replace(/>/g, '%3E')}>)`]
 			: [])
 		.concat(includePlusMarkBadge
 			? [`[![PlusMark](${baseUrl}/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)`]

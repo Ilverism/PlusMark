@@ -1,12 +1,4 @@
-[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=thumbs-up)
-
-[![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=thumbs-down)
-
-[![🔥 Awesome](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=awesome)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=awesome)
-
-[![👀 Uhhhhh](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=uhhhhh)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-35e6c820593a436c&r=uhhhhh)
-
-[![PlusMark](https://plusmark.ilverism.workers.dev/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)
+[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb&r=thumbs-up) [![🔥 Fire](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb&r=fire)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb&r=fire) [![😍 Love It](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb&r=love-it)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb&r=love-it) [![Source: https://github.com/Ilverism/PlusMarkTest](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb)](<https://github.com/Ilverism/PlusMarkTest>) [![PlusMark](https://plusmark.ilverism.workers.dev/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)
 
 # sv
 

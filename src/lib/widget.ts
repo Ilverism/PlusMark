@@ -147,7 +147,7 @@ export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnU
 			? [`[![PlusMark](${baseUrl}/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)`]
 			: []);
 	if (formatting === 'row') return badges.join(' ');
-	if (formatting === 'column') return badges.join('\n\n');
+	if (formatting === 'column') return badges.join('\n');
 
 	const headings = widget.reactions.map(reaction => escapeTableText(reaction.label));
 	const descriptions = widget.reactions.map(reaction => escapeTableText(reaction.description));

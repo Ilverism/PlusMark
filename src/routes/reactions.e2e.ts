@@ -132,7 +132,7 @@ test('formatting selects row, column or tables, copies newlines, and resets on r
 		const text = (await output.textContent())!.trim();
 		expect(text.split('\n')).toHaveLength(lines);
 		if (format.startsWith('table-')) expect(text.split('\n')[0]).toBe('| Thumbs Up | Thumbs Down | Source | PlusMark |');
-		if (format === 'column') expect(text.split('\n\n')).toHaveLength(4);
+		if (format === 'column') expect(text.split('\n')).toHaveLength(4);
 		if (format === 'table-with-desc') expect(text.split('\n')[3]).toBe('| I like this! | I dislike this! |  |  |');
 		await page.getByRole('button', { name: 'Copy', exact: true }).click();
 		await expect(page.getByRole('status')).toContainText('Copied!');

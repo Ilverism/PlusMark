@@ -1,4 +1,5 @@
 // src/lib/Manager.ts
+import { toast } from 'svelte-sonner';
 import { isBadgeTheme, type BadgeTheme } from "$lib/badge-theme";
 import Reaction from "../Reaction.svelte";
 import { buildGroupContentId, buildMarkdownSnippet, createReactionGroupId, createWidgetInput, normalizeDocId, normalizeReturnUrl, slugifyContentId } from "$lib/widget";
@@ -6,6 +7,7 @@ import type { MarkdownFormatting } from "$lib/widget";
 
 const BADGE_PREFERENCE_KEY = "plusmark:include-badge";
 const SOURCE_PREFERENCE_KEY = "plusmark:verify-referrer";
+const GENERATION_TOAST_ID = 'reaction-generation';
 
 export type EmojiPickerAnchorRect = {
 	top: number;
@@ -279,10 +281,13 @@ class Manager {
 	 * Begins the Markdown generation process for the current reactions.
 	 */
 	async generateStart(): Promise<string> {
+		if (this.isGenerating) return "";
+		toast.dismiss(GENERATION_TOAST_ID);
 		this.fillContentIdFromUrl();
 		this.hasAttemptedGenerate = true;
 		if (!normalizeReturnUrl(this.returnUrl) || !this.groupContentId
 			|| this.reactions.some(reaction => !reaction.name.trim())) {
+			toast.warning('Check the highlighted fields', { id: GENERATION_TOAST_ID });
 			return "";
 		}
 
@@ -306,6 +311,7 @@ class Manager {
 
 		if (!widgetInput) {
 			this.error = "Enter a valid return URL and at least one reaction.";
+			toast.error('Could not generate reactions', { id: GENERATION_TOAST_ID, description: this.error });
 			this.generateFinish();
 			return "";
 		}
@@ -334,12 +340,21 @@ class Manager {
 
 			const body = await response.json() as {
 				widget?: typeof widgetInput & { badgeTheme: BadgeTheme };
+				created?: boolean;
 				editToken?: string;
 				error?: string;
 			};
 
 			if (!response.ok || !body.widget) {
 				this.error = body.error ?? "Generation failed.";
+				if (response.status === 409) {
+					toast.warning('Reaction group already exists', {
+						id: GENERATION_TOAST_ID,
+						description: 'This group was not changed. Use a different Content ID or Reaction Group ID, or return to the browser tab that created it.'
+					});
+				} else {
+					toast.error('Could not generate reactions', { id: GENERATION_TOAST_ID, description: this.error });
+				}
 				return "";
 			}
 
@@ -349,9 +364,16 @@ class Manager {
 			}
 
 			this.output = buildMarkdownSnippet(body.widget, window.location.origin, this.includePlusMarkBadge, this.includeSourceBadge, this.formatting, this.includeIdTag);
+			if (body.created === false) {
+				toast.warning('Existing reaction group updated', {
+					id: GENERATION_TOAST_ID,
+					description: 'Matching reactions keep their votes. Use a new Reaction Group ID to start a separate group.'
+				});
+			}
 			return this.output;
 		} catch {
-			this.error = "Generation failed. Check that the Worker preview server is running.";
+			this.error = "Generation failed. Check your connection and try again.";
+			toast.error('Could not generate reactions', { id: GENERATION_TOAST_ID, description: this.error });
 			return "";
 		} finally {
 			this.generateFinish();

@@ -1,5 +1,67 @@
 import { expect, test } from '@playwright/test';
 
+test('Sonner warns on existing group updates, deduplicates retries, and follows the page theme', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	await page.locator('#return-url').fill('https://example.test/notifications');
+	await page.locator('#return-url').press('Tab');
+	await page.locator('#content-id').fill(`toast-${crypto.randomUUID()}`);
+	const generate = page.getByRole('button', { name: 'Generate', exact: true });
+	const created = page.waitForResponse(response => response.url().endsWith('/api/widgets') && response.request().method() === 'POST');
+	await generate.click();
+	expect((await (await created).json()).created).toBe(true);
+	await expect(page.locator('.main-card-generated-code')).toContainText('/badge?doc=');
+	await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
+	for (let attempt = 0; attempt < 2; attempt++) {
+		await page.getByLabel('Formatting', { exact: true }).selectOption(attempt === 0 ? 'column' : 'row');
+		const updated = page.waitForResponse(response => response.url().endsWith('/api/widgets') && response.request().method() === 'POST');
+		await generate.click();
+		expect((await (await updated).json()).created).toBe(false);
+		await expect(page.locator('[data-sonner-toast][data-type="warning"]')).toContainText('Existing reaction group updated');
+		await expect(page.locator('[data-sonner-toast]')).toHaveCount(1);
+	}
+	await page.getByRole('button', { name: 'Switch to dark theme' }).click();
+	await expect(page.locator('[data-sonner-toaster]')).toHaveAttribute('data-sonner-theme', 'dark');
+	await page.locator('[data-sonner-toast] [data-close-button]').click();
+	await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
+});
+
+test('Sonner warns on a group collision without edit access and preserves its reactions', async ({ page, request }) => {
+	const doc = `toast-collision-${crypto.randomUUID()}`;
+	await request.post('/api/widgets', { data: {
+		doc, returnUrl: 'https://example.test/original', reactions: [{ id: 'original', emoji: '🔥', label: 'Original', description: '' }]
+	} });
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	await page.locator('#return-url').fill('https://example.test/replacement');
+	await page.locator('#return-url').press('Tab');
+	await page.locator('#content-id').fill(doc);
+	await page.locator('#reaction-group-id').fill('');
+	await page.getByRole('button', { name: 'Generate', exact: true }).click();
+	await expect(page.locator('[data-sonner-toast][data-type="warning"]')).toContainText('Reaction group already exists');
+	await expect(page.locator('.main-card-generated-code')).not.toContainText('/badge?doc=');
+	expect(await (await request.get(`/badge?doc=${doc}&r=original`)).text()).toContain('Original');
+});
+
+test('Sonner reports invalid fields and failed requests, then clears the notification on a successful retry', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	const generate = page.getByRole('button', { name: 'Generate', exact: true });
+	await generate.click();
+	await expect(page.locator('[data-sonner-toast]')).toContainText('Check the highlighted fields');
+	await page.locator('#return-url').fill('https://example.test/errors');
+	await page.locator('#return-url').press('Tab');
+	await page.locator('#content-id').fill(`toast-error-${crypto.randomUUID()}`);
+	await page.route('**/api/widgets', route => route.abort());
+	await generate.click();
+	await expect(page.locator('[data-sonner-toast][data-type="error"]')).toContainText('Could not generate reactions');
+	await page.unroute('**/api/widgets');
+	await page.getByLabel('Formatting', { exact: true }).selectOption('column');
+	await generate.click();
+	await expect(page.locator('.main-card-generated-code')).toContainText('/badge?doc=');
+	await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
+});
+
 test('ID tag checkbox generates the saved full ID in each format and copies it unchanged', async ({ page, context }) => {
 	await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 	await page.goto('/');

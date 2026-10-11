@@ -4,6 +4,7 @@
 	import type { Pathname } from '$app/types';
 	import favicon from '$lib/assets/favicon.svg';
 	import * as Tooltip from "$lib/components/ui/tooltip/index.js";
+	import { Toaster } from '$lib/components/ui/sonner';
 	import Manager from "$lib/Manager.svelte";
 	import { locales, localizeHref } from '$lib/paraglide/runtime';
 	import { ModeWatcher } from 'mode-watcher';
@@ -15,6 +16,7 @@
 </script>
 
 <ModeWatcher defaultMode="light" modeStorageKey="plusmark:theme" />
+<Toaster position="bottom-right" closeButton duration={8000} />
 
 <!-- Background -->
 <div class="background-pattern" class:generating={Manager.isGenerating} aria-hidden="true"></div>

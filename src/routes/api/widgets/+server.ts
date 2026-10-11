@@ -41,6 +41,7 @@ export const POST: RequestHandler = async (event) => {
 
 	return json({
 		widget: result.widget,
+		created: result.created,
 		editToken: result.created ? createToken : undefined
 	});
 };

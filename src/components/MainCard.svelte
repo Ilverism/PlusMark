@@ -210,6 +210,13 @@
 					onCheckedChange={(checked) => Manager.setIncludeSourceBadge(checked)} />
 			</Field.Field>
 
+			<!-- Include ID tag -->
+			<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
+				<Field.Label for="include-id-tag" class="text-base font-semibold">Include ID tag</Field.Label>
+				<Checkbox id="include-id-tag" checked={Manager.includeIdTag}
+					onCheckedChange={(checked) => Manager.setIncludeIdTag(checked)} />
+			</Field.Field>
+
 			<!-- Include PlusMark badge -->
 			<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
 				<Field.Label for="include-badge" class="text-base font-semibold">Include PlusMark badge</Field.Label>

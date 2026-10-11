@@ -131,8 +131,9 @@ export type MarkdownFormatting = 'row' | 'column' | 'table-no-desc' | 'table-wit
 export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnUrl'> & {
 	badgeTheme?: BadgeTheme;
 	reactions: WidgetReactionInput[];
-}, origin: string, includePlusMarkBadge = true, includeSourceBadge = false, formatting: MarkdownFormatting = 'row'): string {
+}, origin: string, includePlusMarkBadge = true, includeSourceBadge = false, formatting: MarkdownFormatting = 'row', includeIdTag = false): string {
 	const baseUrl = origin.replace(/\/$/, '');
+	const idTag = `<sup><sub><code>${escapeTableText(widget.doc)}</code></sub></sup>`;
 
 	// Source images have no vote-driven purges; version rendering changes and theme changes in the URL.
 	const badges = widget.reactions
@@ -151,13 +152,27 @@ export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnU
 		.concat(includePlusMarkBadge
 			? [`[![PlusMark](${baseUrl}/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)`]
 			: []);
-	if (formatting === 'row') return badges.join(' ');
-	if (formatting === 'column') return badges.join('\n');
+	if (formatting === 'row') return badges.join(' ') + (includeIdTag ? `\n\n${idTag}` : '');
+	if (formatting === 'column') {
+		if (includeIdTag) badges.splice(badges.length - Number(includePlusMarkBadge), 0, idTag);
+		return badges.join('\n');
+	}
 
 	const headings = widget.reactions.map(reaction => escapeTableText(reaction.label));
 	const descriptions = widget.reactions.map(reaction => escapeTableText(reaction.description));
 	if (includeSourceBadge) { headings.push('Source'); descriptions.push(''); }
 	if (includePlusMarkBadge) { headings.push('PlusMark'); descriptions.push(''); }
+	if (includeIdTag) {
+		const index = widget.reactions.length;
+		// Without a source badge, keep the ID in its own column before branding.
+		if (!includeSourceBadge) {
+			headings.splice(index, 0, 'ID');
+			badges.splice(index, 0, '');
+			descriptions.splice(index, 0, '');
+		}
+		if (formatting === 'table-with-desc') descriptions[index] = idTag;
+		else badges[index] += (includeSourceBadge ? '<br/>' : '') + idTag;
+	}
 	const tableRow = (cells: string[]) => `| ${cells.join(' | ')} |`;
 	const rows = [
 		tableRow(headings),

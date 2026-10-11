@@ -1,5 +1,43 @@
 import { expect, test } from '@playwright/test';
 
+test('ID tag checkbox generates the saved full ID in each format and copies it unchanged', async ({ page, context }) => {
+	await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	const toggle = page.getByRole('checkbox', { name: 'Include ID tag' });
+	await expect(toggle).not.toBeChecked();
+	await page.locator('#return-url').fill('https://example.test/id-tag');
+	await page.locator('#content-id').fill(`id-tag-${Date.now()}`);
+	await toggle.check();
+	for (const source of [true, false]) {
+		await page.getByRole('checkbox', { name: 'Include source badge' }).setChecked(source);
+		for (const format of ['row', 'column', 'table-no-desc', 'table-with-desc']) {
+			await page.getByLabel('Formatting', { exact: true }).selectOption(format);
+			await page.getByRole('button', { name: 'Generate', exact: true }).click();
+			const output = page.locator('.main-card-generated-code');
+			await expect(output).toContainText('<sup><sub><code>');
+			const text = (await output.textContent())!.trim();
+			const doc = new URL(text.match(/https?:\/\/[^\s)]+\/badge\?[^)]+/)![0]).searchParams.get('doc');
+			expect(doc).toMatch(/-g-[a-z0-9]+$/);
+			const tag = `<sup><sub><code>${doc}</code></sub></sup>`;
+			expect(text.split(tag)).toHaveLength(2);
+			if (format === 'row') expect(text.endsWith(`\n\n${tag}`)).toBe(true);
+			if (format === 'column') expect(text.split('\n').at(-2)).toBe(tag);
+			if (format.startsWith('table-')) {
+				const rows = text.split('\n').map(row => row.slice(2, -2).split(' | '));
+				expect(rows[0][2]).toBe(source ? 'Source' : 'ID');
+				expect(rows[format === 'table-with-desc' ? 3 : 2][2]).toContain(tag);
+			}
+			await page.getByRole('button', { name: 'Copy', exact: true }).click();
+			expect((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n')).toBe(text);
+		}
+	}
+	await toggle.uncheck();
+	await page.getByRole('button', { name: 'Generate', exact: true }).click();
+	await expect(page.locator('.main-card-generated-code')).toContainText('/badge?doc=');
+	await expect(page.locator('.main-card-generated-code')).not.toContainText('<sup>');
+});
+
 test('probes do not create identities and ordinary GETs do not vote', async ({ request }) => {
 	const doc = `automated-probes-${crypto.randomUUID()}`;
 	const returnUrl = 'https://example.com/markdown-source';

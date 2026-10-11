@@ -34,6 +34,7 @@ class Manager {
 	private contentIdEdited = false;
 	includePlusMarkBadge: boolean = $state(true);
 	includeSourceBadge: boolean = $state(true);
+	includeIdTag: boolean = $state(false);
 	formatting: MarkdownFormatting = $state('row');
 	badgeTheme: BadgeTheme = $state('light');
 	error: string = $state("");
@@ -251,6 +252,11 @@ class Manager {
 		this.markDirty();
 	}
 
+	setIncludeIdTag(value: boolean) {
+		this.includeIdTag = value;
+		this.markDirty();
+	}
+
 	setBadgeTheme(value: string) {
 		if (!isBadgeTheme(value)) return;
 		this.badgeTheme = value;
@@ -342,7 +348,7 @@ class Manager {
 				try { sessionStorage.setItem(editTokenStorageKey, body.editToken); } catch { /* The generated badges still work. */ }
 			}
 
-			this.output = buildMarkdownSnippet(body.widget, window.location.origin, this.includePlusMarkBadge, this.includeSourceBadge, this.formatting);
+			this.output = buildMarkdownSnippet(body.widget, window.location.origin, this.includePlusMarkBadge, this.includeSourceBadge, this.formatting, this.includeIdTag);
 			return this.output;
 		} catch {
 			this.error = "Generation failed. Check that the Worker preview server is running.";

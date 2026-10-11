@@ -31,6 +31,7 @@ class Manager {
 	contentIdInvalid = $derived(this.hasAttemptedGenerate && !normalizeDocId(this.contentId));
 	private contentIdEdited = false;
 	includePlusMarkBadge: boolean = $state(true);
+	includeSourceBadge: boolean = $state(true);
 	error: string = $state("");
 	reactions: Reaction[] = $state([]);
 	reactionEmojiEditing: Reaction | null = $state(null);
@@ -241,6 +242,11 @@ class Manager {
 		}
 	}
 
+	setIncludeSourceBadge(value: boolean) {
+		this.includeSourceBadge = value;
+		this.markDirty();
+	}
+
 	markDirty() {
 		this.didStartGenerate = false;
 		this.output = "";
@@ -319,7 +325,7 @@ class Manager {
 				try { sessionStorage.setItem(editTokenStorageKey, body.editToken); } catch { /* The generated badges still work. */ }
 			}
 
-			this.output = buildMarkdownSnippet(body.widget, window.location.origin, this.includePlusMarkBadge);
+			this.output = buildMarkdownSnippet(body.widget, window.location.origin, this.includePlusMarkBadge, this.includeSourceBadge);
 			return this.output;
 		} catch {
 			this.error = "Generation failed. Check that the Worker preview server is running.";

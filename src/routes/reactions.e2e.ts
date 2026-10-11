@@ -95,6 +95,43 @@ test('crawler guidance excludes reaction links', async ({ request }) => {
 	expect(await robots.text()).toMatch(/^Disallow: \/react\s*$/m);
 });
 
+test('source badges identify the saved destination, match reaction dots, and render as images', async ({ page, request }) => {
+	const doc = `source-badge-${crypto.randomUUID()}`;
+	const returnUrl = 'https://example.test/a-long-document-path/with-more-sections?name=%22%3Cunsafe%3E#comment-123';
+	await request.post('/api/widgets', { data: { doc, returnUrl, reactions: [{ id: 'like', emoji: '👍', label: 'Like', description: '' }] } });
+	const source = await request.get(`/source-badge?doc=${doc}&returnUrl=https://evil.example/`);
+	expect(source.status()).toBe(200);
+	expect(source.headers()['content-type']).toContain('image/svg+xml');
+	const svg = await source.text();
+	expect(svg).toContain(`Source: ${returnUrl}`);
+	expect(svg).not.toContain('evil.example');
+	const reaction = await (await request.get(`/badge?doc=${doc}&r=like`)).text();
+	expect(svg.match(/<linearGradient.*?<\/linearGradient>/s)?.[0]).toBe(reaction.match(/<linearGradient.*?<\/linearGradient>/s)?.[0]);
+	expect((await request.get('/source-badge')).status()).toBe(400);
+	expect((await request.get('/source-badge?doc=not-a-real-doc')).status()).toBe(404);
+	await page.goto('/');
+	await page.evaluate(url => {
+		const img = document.createElement('img'); img.id = 'source-badge-check'; img.src = url; document.body.append(img);
+	}, `/source-badge?doc=${doc}`);
+	await expect.poll(() => page.locator('#source-badge-check').evaluate(img => (img as HTMLImageElement).naturalHeight)).toBe(24);
+});
+
+test('source badge defaults on and can be omitted from generated output', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	const toggle = page.getByRole('checkbox', { name: 'Include source badge' });
+	await expect(toggle).toBeChecked();
+	await page.locator('#return-url').fill('https://example.test/article#section');
+	await page.locator('#content-id').fill(`source-option-${Date.now()}`);
+	await page.getByRole('button', { name: 'Generate', exact: true }).click();
+	await expect(page.locator('.main-card-generated-code')).toContainText('/source-badge?doc=');
+	await expect(page.locator('.main-card-generated-code')).toContainText('](<https://example.test/article#section>)');
+	await toggle.uncheck();
+	await page.getByRole('button', { name: 'Generate', exact: true }).click();
+	await expect(page.locator('.main-card-generated-code')).toContainText('/badge?doc=');
+	await expect(page.locator('.main-card-generated-code')).not.toContainText('/source-badge?');
+});
+
 test('creates, protects, and renders a reaction widget without voting on GET', async ({ request }) => {
 	const doc = `playwright-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 	const returnUrl = 'https://example.com/markdown-source';
@@ -179,7 +216,7 @@ test('generated Markdown ends with a renderable linked PlusMark badge', async ({
 	expect(logo.ok()).toBe(true);
 	expect(logo.headers()['content-type']).toContain('image/svg+xml');
 	const images = [...markdown.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(match => match[1]);
-	expect(images).toHaveLength(3);
+	expect(images).toHaveLength(4);
 	await page.evaluate(urls => {
 		for (const url of urls) {
 			const image = document.createElement('img');

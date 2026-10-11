@@ -299,6 +299,7 @@ class DevReactionDocument implements ReactionDocumentStub {
 		return {
 			ok: true as const,
 			reaction: { ...reaction, count: publication.published_count },
+			returnUrl: this.record.widget.returnUrl,
 			throttled: publication.throttled_until > 0,
 			refreshAt: badgeRefreshAt(publication)
 		};

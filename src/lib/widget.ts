@@ -125,7 +125,7 @@ export function createWidgetInput(draft: WidgetDraft): {
 
 export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnUrl'> & {
 	reactions: WidgetReactionInput[];
-}, origin: string, includePlusMarkBadge = true): string {
+}, origin: string, includePlusMarkBadge = true, includeSourceBadge = false): string {
 	const baseUrl = origin.replace(/\/$/, '');
 
 	return widget.reactions
@@ -138,6 +138,9 @@ export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnU
 
 			return `[![${reaction.emoji} ${label}](${badgeUrl})](${reactUrl})`;
 		})
+		.concat(includeSourceBadge
+			? [`[![Source: ${escapeMarkdownAlt(widget.returnUrl)}](${baseUrl}/source-badge?doc=${encodeURIComponent(widget.doc)})](<${widget.returnUrl.replace(/</g, '%3C').replace(/>/g, '%3E')}>)`]
+			: [])
 		.concat(includePlusMarkBadge
 			? [`[![PlusMark](${baseUrl}/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)`]
 			: [])

@@ -83,6 +83,7 @@ type WidgetSuccess = {
 
 type BadgeSuccess = {
 	ok: true;
+	returnUrl: string;
 	reaction: PublicWidgetReaction;
 	throttled: boolean;
 	refreshAt: number;
@@ -227,6 +228,7 @@ export class ReactionDocument extends DurableObject {
 		return {
 			ok: true,
 			reaction: { ...reaction, count: publication.state.published_count },
+			returnUrl: widget.return_url,
 			throttled: publication.state.throttled_until > 0,
 			refreshAt: badgeRefreshAt(publication.state)
 		};

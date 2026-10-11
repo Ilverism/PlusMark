@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
 import { formatReactionCount } from '../src/lib/reaction-count.ts';
 import { buildMarkdownSnippet } from '../src/lib/widget.ts';
+import * as marker from '../src/lib/server/destination-marker.ts';
 
 const routeSource = await readFile(new URL('../src/routes/badge/+server.ts', import.meta.url), 'utf8');
 const compiledRoute = ts.transpileModule(routeSource, {
@@ -13,13 +14,14 @@ const compiledRoute = ts.transpileModule(routeSource, {
 async function renderBadge(count, emoji = '👍', label = 'Like', options = {}) {
 	const exports = {};
 	new Function('require', 'exports', compiledRoute)(name => {
+		if (name === '$lib/server/destination-marker') return marker;
 		if (name === '$lib/reaction-count') return { formatReactionCount };
 		if (name === '$lib/server/reaction-service') return {
 			parseDocAndReaction: () => ({ doc: options.doc ?? 'test', reaction: 'like' }),
 			getReactionDocumentStub: async () => {
 				options.onRead?.();
 				return { getBadge: async () => ({
-					ok: true, reaction: { count, emoji, label },
+					ok: true, reaction: { count, emoji, label }, returnUrl: options.returnUrl ?? 'https://example.com/article',
 					throttled: options.throttled ?? false, refreshAt: options.refreshAt ?? 0
 				}) };
 			}
@@ -37,6 +39,28 @@ test('throttled SVG has a gray hourglass, extra space, and a delayed-count label
 	assert.match(throttled, /stroke="#9ca3af"/);
 	assert.match(throttled, /count updates delayed/);
 	assert.equal(Number(throttled.match(/width="(\d+)"/)[1]), Number(normal.match(/width="(\d+)"/)[1]) + 16);
+	const dotX = Number(throttled.match(/cx="(\d+)"/)[1]);
+	const hourglassX = Number(throttled.match(/data-throttled="true" transform="translate\((\d+)/)[1]);
+	assert.ok(hourglassX + 9 < dotX - 5, 'hourglass and destination dot must not overlap');
+	assert.match(throttled, /clip-path="url\(#count-slot\)"/);
+});
+
+test('destination markers are stable, use the saved URL, and distinguish fragments', async () => {
+	assert.deepEqual(await marker.destinationColors('https://EXAMPLE.com:443/a#one'), await marker.destinationColors('https://example.com/a#one'));
+	assert.notDeepEqual(await marker.destinationColors('https://example.com/a#one'), await marker.destinationColors('https://example.com/a#two'));
+	const first = await (await renderBadge(1)).text();
+	const next = await (await renderBadge(2)).text();
+	assert.equal(first.match(/<linearGradient.*?<\/linearGradient>/s)[0], next.match(/<linearGradient.*?<\/linearGradient>/s)[0]);
+	assert.match(first, /Source: https:\/\/example.com\/article/);
+});
+
+test('source badge is optional, inline, before branding, and links directly to the return URL', () => {
+	const widget = { doc: 'example', returnUrl: 'https://example.com/a_(b)?x=1&y=2#section', reactions: [{ id: 'like', emoji: '👍', label: 'Like', description: '' }] };
+	const markdown = buildMarkdownSnippet(widget, 'https://badges.example', true, true);
+	assert.ok(markdown.includes('/source-badge?doc=example)](<https://example.com/a_(b)?x=1&y=2#section>)'));
+	assert.ok(markdown.indexOf('/source-badge?') < markdown.indexOf('/PlusMark-badge.svg'));
+	assert.ok(!/[\r\n]/.test(markdown));
+	assert.ok(!buildMarkdownSnippet(widget, 'https://badges.example', true, false).includes('/source-badge?'));
 });
 
 test('snapshot cache bypasses the Durable Object, expires on publication, and isolates documents', async t => {

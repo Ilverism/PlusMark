@@ -199,6 +199,13 @@
 			</div>
 		</Field.Field>
 
+		<!-- Include source badge -->
+		<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
+			<Field.Label for="include-source-badge" class="text-base font-semibold">Include source badge</Field.Label>
+			<Checkbox id="include-source-badge" checked={Manager.includeSourceBadge}
+				onCheckedChange={(checked) => Manager.setIncludeSourceBadge(checked)} />
+		</Field.Field>
+
 		<!-- Include PlusMark badge -->
 		<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
 			<Field.Label for="include-badge" class="text-base font-semibold">Include PlusMark badge</Field.Label>

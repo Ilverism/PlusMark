@@ -121,6 +121,26 @@ in production builds, including `pnpm preview`.
 
 ## Badge appearance and counts
 
+Reaction badges include a two-color destination dot derived from the normalized,
+stored Return URL (including query and fragment). The optional source badge uses
+the same dot, shows a shortened destination, and links directly to that URL.
+It follows the reactions and precedes the PlusMark branding badge, which has no
+dot. The source checkbox defaults on for each new session; it does not persist
+additional form state. Dots identify destinations, not groups or verified origins,
+and similar colors are possible. The complete destination is included in badge
+titles and generated source-image alt text. Count, hourglass, and dot have separate
+reserved spaces.
+
+Source favicons are fetched server-side using Google's favicon service, sending
+only the hostname. Only bounded PNG responses from the provider's allowed hosts
+are embedded, with a link icon fallback for missing icons or failed lookups.
+The Worker caches successful icons for a day and failed lookups for ten minutes.
+No third-party image is loaded by the viewer inside the SVG, and reaction badge
+requests never fetch favicons. The provider is best-effort and needs no API key.
+Regenerate existing Markdown to add a source badge, or after changing a Return URL
+so the source link updates too. Old reaction links continue working and acquire
+their dots when their images refresh; throttled snapshots may lag until expiry.
+
 Reaction badges add a subtle shadow behind the emoji. Counts below 1,000 remain
 exact; larger counts are truncated to one decimal place using `k`, `m`, `b`, or
 `t` (trailing `.0` is omitted). For example, 2,315 and 2,388 both display `2.3k`,

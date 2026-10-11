@@ -281,3 +281,49 @@ test('remembers the logo preference and applies it to regenerated Markdown', asy
 	await page.waitForLoadState('networkidle');
 	await expect(includeBadge).toBeChecked();
 });
+
+test('badge themes generate matching reaction/source images without changing the branding badge', async ({ page, request }) => {
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	const select = page.getByLabel('Badge Theme', { exact: true });
+	await expect(select).toHaveValue('light');
+	await page.locator('#return-url').fill('https://example.test/themes');
+	await page.locator('#content-id').fill(`theme-${crypto.randomUUID()}`);
+	const branding = await (await request.get('/PlusMark-badge.svg')).text();
+	let reactionUrl = '';
+	for (const [theme, background, border] of [
+		['light', '#f6f8fa', '#d1d9e0'], ['dark', '#212830', '#3d444d'], ['soft-dark', '#2a313c', '#3d444d']
+	]) {
+		await select.selectOption(theme);
+		await page.getByRole('button', { name: 'Generate', exact: true }).click();
+		const output = page.locator('.main-card-generated-code');
+		await expect(output).toContainText(`/source-badge?`);
+		const markdown = (await output.textContent())!.trim();
+		const images = [...markdown.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(match => match[1]);
+		expect(images).toHaveLength(4);
+		expect(images[2]).toContain(`&theme=${theme}`);
+		expect(images[3]).toMatch(/\/PlusMark-badge\.svg$/);
+		if (reactionUrl) expect(images[0]).toBe(reactionUrl);
+		reactionUrl = images[0];
+		for (const url of images.slice(0, 3)) {
+			const svg = await (await request.get(url)).text();
+			expect(svg).toContain(`fill="${background}" stroke="${border}"`);
+			expect(svg).toContain('height="24"');
+		}
+		expect(await (await request.get(images[3])).text()).toBe(branding);
+	}
+	await page.reload();
+	await expect(select).toHaveValue('light');
+});
+
+test('badge theme validation rejects unknown values and old clients preserve a saved theme', async ({ request }) => {
+	const payload = { doc: `theme-api-${crypto.randomUUID()}`, returnUrl: 'https://example.test/', reactions: [{ id: 'like', emoji: '👍', label: 'Like', description: '' }] };
+	for (const badgeTheme of ['invalid', '<svg>', null, {}, 1]) {
+		expect((await request.post('/api/widgets', { data: { ...payload, badgeTheme } })).status()).toBe(400);
+	}
+	const created = await (await request.post('/api/widgets', { data: { ...payload, badgeTheme: 'dark' } })).json();
+	expect(created.widget.badgeTheme).toBe('dark');
+	expect((await request.post('/api/widgets', { data: { ...payload, badgeTheme: 'light' } })).status()).toBe(409);
+	const updated = await (await request.post('/api/widgets', { data: { ...payload, editToken: created.editToken } })).json();
+	expect(updated.widget.badgeTheme).toBe('dark');
+});

@@ -1,3 +1,5 @@
+import type { BadgeTheme } from './badge-theme';
+
 export type WidgetReactionInput = {
 	id: string;
 	emoji: string;
@@ -13,6 +15,7 @@ export type PublicWidget = {
 	doc: string;
 	returnUrl: string;
 	verifyReferrer: boolean;
+	badgeTheme: BadgeTheme;
 	reactions: PublicWidgetReaction[];
 	createdAt: number;
 	updatedAt: number;
@@ -126,10 +129,12 @@ export function createWidgetInput(draft: WidgetDraft): {
 export type MarkdownFormatting = 'row' | 'column' | 'table-no-desc' | 'table-with-desc';
 
 export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnUrl'> & {
+	badgeTheme?: BadgeTheme;
 	reactions: WidgetReactionInput[];
 }, origin: string, includePlusMarkBadge = true, includeSourceBadge = false, formatting: MarkdownFormatting = 'row'): string {
 	const baseUrl = origin.replace(/\/$/, '');
 
+	// Source images have no vote-driven purges; vary their URL when regenerating with a new theme.
 	const badges = widget.reactions
 		.map((reaction) => {
 			const doc = encodeURIComponent(widget.doc);
@@ -141,7 +146,7 @@ export function buildMarkdownSnippet(widget: Pick<PublicWidget, 'doc' | 'returnU
 			return `[![${reaction.emoji} ${label}](${badgeUrl})](${reactUrl})`;
 		})
 		.concat(includeSourceBadge
-			? [`[![Source: ${escapeMarkdownAlt(widget.returnUrl)}](${baseUrl}/source-badge?doc=${encodeURIComponent(widget.doc)})](<${widget.returnUrl.replace(/</g, '%3C').replace(/>/g, '%3E')}>)`]
+			? [`[![Source: ${escapeMarkdownAlt(widget.returnUrl)}](${baseUrl}/source-badge?doc=${encodeURIComponent(widget.doc)}${widget.badgeTheme ? `&theme=${widget.badgeTheme}` : ''})](<${widget.returnUrl.replace(/</g, '%3C').replace(/>/g, '%3E')}>)`]
 			: [])
 		.concat(includePlusMarkBadge
 			? [`[![PlusMark](${baseUrl}/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)`]

@@ -1,4 +1,5 @@
 // src/lib/Manager.ts
+import { isBadgeTheme, type BadgeTheme } from "$lib/badge-theme";
 import Reaction from "../Reaction.svelte";
 import { buildGroupContentId, buildMarkdownSnippet, createReactionGroupId, createWidgetInput, normalizeDocId, normalizeReturnUrl, slugifyContentId } from "$lib/widget";
 import type { MarkdownFormatting } from "$lib/widget";
@@ -34,6 +35,7 @@ class Manager {
 	includePlusMarkBadge: boolean = $state(true);
 	includeSourceBadge: boolean = $state(true);
 	formatting: MarkdownFormatting = $state('row');
+	badgeTheme: BadgeTheme = $state('light');
 	error: string = $state("");
 	reactions: Reaction[] = $state([]);
 	reactionEmojiEditing: Reaction | null = $state(null);
@@ -249,6 +251,12 @@ class Manager {
 		this.markDirty();
 	}
 
+	setBadgeTheme(value: string) {
+		if (!isBadgeTheme(value)) return;
+		this.badgeTheme = value;
+		this.markDirty();
+	}
+
 	setFormatting(value: string) {
 		if (value !== 'row' && value !== 'column' && value !== 'table-no-desc' && value !== 'table-with-desc') return;
 		this.formatting = value;
@@ -313,12 +321,13 @@ class Manager {
 				body: JSON.stringify({
 					...widgetInput,
 					verifyReferrer: this.verifyReferrer,
+					badgeTheme: this.badgeTheme,
 					editToken
 				})
 			});
 
 			const body = await response.json() as {
-				widget?: typeof widgetInput;
+				widget?: typeof widgetInput & { badgeTheme: BadgeTheme };
 				editToken?: string;
 				error?: string;
 			};

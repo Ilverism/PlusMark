@@ -1,3 +1,4 @@
+import { isBadgeTheme, type BadgeTheme } from '$lib/badge-theme';
 import { error, json, type RequestEvent } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { devStatistics } from './dev-statistics';
@@ -24,6 +25,7 @@ type WidgetPayload = {
 	doc: string;
 	returnUrl: string;
 	verifyReferrer?: boolean;
+	badgeTheme?: BadgeTheme;
 	reactions: WidgetReactionInput[];
 	editToken: string | null;
 };
@@ -76,6 +78,9 @@ export function parseWidgetPayload(payload: unknown): WidgetPayload | JsonFailur
 	if (payload.verifyReferrer !== undefined && typeof payload.verifyReferrer !== 'boolean') {
 		return json({ error: 'Verify referrer must be a boolean.' }, { status: 400 });
 	}
+	if (payload.badgeTheme !== undefined && !isBadgeTheme(payload.badgeTheme)) {
+		return json({ error: 'Badge theme must be light, dark, or soft-dark.' }, { status: 400 });
+	}
 	if (!Array.isArray(payload.reactions) || payload.reactions.length === 0) {
 		return json({ error: 'At least one reaction is required.' }, { status: 400 });
 	}
@@ -111,6 +116,7 @@ export function parseWidgetPayload(payload: unknown): WidgetPayload | JsonFailur
 		doc,
 		returnUrl,
 		verifyReferrer: payload.verifyReferrer as boolean | undefined,
+		badgeTheme: payload.badgeTheme as BadgeTheme | undefined,
 		reactions,
 		editToken
 	};
@@ -261,6 +267,7 @@ class DevReactionDocument implements ReactionDocumentStub {
 				doc: command.widget.doc,
 				returnUrl: command.widget.returnUrl,
 				verifyReferrer: command.widget.verifyReferrer ?? this.record?.widget.verifyReferrer ?? false,
+				badgeTheme: command.widget.badgeTheme ?? this.record?.widget.badgeTheme ?? 'light',
 				reactions: command.widget.reactions.map((reaction) => ({
 					...reaction,
 					count: previousCounts.get(reaction.id) ?? 0
@@ -307,6 +314,7 @@ class DevReactionDocument implements ReactionDocumentStub {
 		return {
 			ok: true as const,
 			reaction: { ...reaction, count: publication.published_count },
+			badgeTheme: this.record.widget.badgeTheme,
 			returnUrl: this.record.widget.returnUrl,
 			throttled: publication.throttled_until > 0,
 			refreshAt: badgeRefreshAt(publication)

@@ -1,3 +1,4 @@
+import type { BadgeTheme } from '../badge-theme';
 import { DurableObject } from 'cloudflare:workers';
 import { DocumentStatistics } from './document-statistics';
 import { isReactionSourceAllowed, reactionSourceFailure } from './reaction-source';
@@ -17,6 +18,7 @@ type WidgetRow = SqlRow & {
 	doc: string;
 	return_url: string;
 	verify_referrer: number;
+	badge_theme: BadgeTheme;
 	edit_token_hash: string;
 	created_at: number;
 	updated_at: number;
@@ -63,6 +65,7 @@ type SaveWidgetCommand = {
 		doc: string;
 		returnUrl: string;
 		verifyReferrer?: boolean;
+		badgeTheme?: BadgeTheme;
 		reactions: WidgetReactionInput[];
 	};
 	editTokenHash: string | null;
@@ -84,6 +87,7 @@ type WidgetSuccess = {
 
 type BadgeSuccess = {
 	ok: true;
+	badgeTheme: BadgeTheme;
 	returnUrl: string;
 	reaction: PublicWidgetReaction;
 	throttled: boolean;
@@ -140,18 +144,20 @@ export class ReactionDocument extends DurableObject<Env> {
 
 			if (existing) {
 				this.ctx.storage.sql.exec(
-					'UPDATE widget SET return_url = ?, verify_referrer = ?, updated_at = ? WHERE doc = ?',
+					'UPDATE widget SET return_url = ?, verify_referrer = ?, badge_theme = ?, updated_at = ? WHERE doc = ?',
 					command.widget.returnUrl,
 					Number(command.widget.verifyReferrer ?? Boolean(existing.verify_referrer)),
+					command.widget.badgeTheme ?? existing.badge_theme,
 					now,
 					command.widget.doc
 				);
 			} else {
 				this.ctx.storage.sql.exec(
-					'INSERT INTO widget (doc, return_url, verify_referrer, edit_token_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+					'INSERT INTO widget (doc, return_url, verify_referrer, badge_theme, edit_token_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
 					command.widget.doc,
 					command.widget.returnUrl,
 					Number(command.widget.verifyReferrer ?? false),
+					command.widget.badgeTheme ?? 'light',
 					command.createEditTokenHash,
 					now,
 					now
@@ -163,7 +169,8 @@ export class ReactionDocument extends DurableObject<Env> {
 
 			return {
 				ok: true as const,
-				created: !existing
+				created: !existing,
+				themeChanged: !!existing && command.widget.badgeTheme !== undefined && command.widget.badgeTheme !== existing.badge_theme
 			};
 		});
 
@@ -179,6 +186,9 @@ export class ReactionDocument extends DurableObject<Env> {
 		}
 
 		await this.syncGitHubStateAfterWidgetSave();
+		if (saveResult.themeChanged) {
+			for (const reaction of widget.reactions) await this.queueCamoPurge(widget.returnUrl, reaction.id);
+		}
 		await this.ensureAlarmScheduled();
 
 		return {
@@ -233,6 +243,7 @@ export class ReactionDocument extends DurableObject<Env> {
 		return {
 			ok: true,
 			reaction: { ...reaction, count: publication.state.published_count },
+			badgeTheme: widget.badge_theme,
 			returnUrl: widget.return_url,
 			throttled: publication.state.throttled_until > 0,
 			refreshAt: badgeRefreshAt(publication.state)
@@ -403,6 +414,9 @@ export class ReactionDocument extends DurableObject<Env> {
 		);
 		if (!sql.exec<{ name: string }>('PRAGMA table_info(widget)').toArray().some(column => column.name === 'verify_referrer')) {
 			sql.exec('ALTER TABLE widget ADD COLUMN verify_referrer INTEGER NOT NULL DEFAULT 0');
+		}
+		if (!sql.exec<{ name: string }>('PRAGMA table_info(widget)').toArray().some(column => column.name === 'badge_theme')) {
+			sql.exec("ALTER TABLE widget ADD COLUMN badge_theme TEXT NOT NULL DEFAULT 'light'");
 		}
 		sql.exec(
 			'CREATE TABLE IF NOT EXISTS reactions (id TEXT PRIMARY KEY, emoji TEXT NOT NULL, label TEXT NOT NULL, description TEXT NOT NULL DEFAULT \'\', sort_order INTEGER NOT NULL)'
@@ -936,6 +950,7 @@ export class ReactionDocument extends DurableObject<Env> {
 			doc: row.doc,
 			returnUrl: row.return_url,
 			verifyReferrer: Boolean(row.verify_referrer),
+			badgeTheme: row.badge_theme,
 			reactions,
 			createdAt: row.created_at,
 			updatedAt: row.updated_at

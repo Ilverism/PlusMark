@@ -51,6 +51,7 @@ try {
 	await mf.setOptions({ ...options, script: bundle.outputFiles[0].text });
 	let legacyWidget = await rpc('legacy', 'getWidget');
 	assert.equal(legacyWidget.widget.verifyReferrer, false);
+	assert.equal(legacyWidget.widget.badgeTheme, 'light');
 	assert.equal(legacyWidget.widget.reactions[0].count, 1);
 	assert.deepEqual(await rpc('legacy', 'getStatistics'), { reactions: 0, votes: 0 }, 'historical activity is not backfilled');
 	assert.equal((await rpc('legacy', 'toggleReaction', 'like', 'existing-voter', 'https://other.example/')).count, 0);

@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
 import { formatReactionCount } from '../src/lib/reaction-count.ts';
 import { buildMarkdownSnippet } from '../src/lib/widget.ts';
+import * as themes from '../src/lib/badge-theme.ts';
 import * as marker from '../src/lib/server/destination-marker.ts';
 import { compile } from 'mdsvex';
 
@@ -39,6 +40,7 @@ async function renderBadge(count, emoji = '👍', label = 'Like', options = {}) 
 	const exports = {};
 	new Function('require', 'exports', compiledRoute)(name => {
 		if (name === '$lib/server/destination-marker') return marker;
+		if (name === '$lib/badge-theme') return themes;
 		if (name === '$lib/reaction-count') return { formatReactionCount };
 		if (name === '$lib/server/reaction-service') return {
 			parseDocAndReaction: () => ({ doc: options.doc ?? 'test', reaction: 'like' }),
@@ -46,7 +48,7 @@ async function renderBadge(count, emoji = '👍', label = 'Like', options = {}) 
 				options.onRead?.();
 				return { getBadge: async () => ({
 					ok: true, reaction: { count, emoji, label }, returnUrl: options.returnUrl ?? 'https://example.com/article',
-					throttled: options.throttled ?? false, refreshAt: options.refreshAt ?? 0
+					badgeTheme: options.badgeTheme, throttled: options.throttled ?? false, refreshAt: options.refreshAt ?? 0
 				}) };
 			}
 		};
@@ -60,7 +62,7 @@ test('throttled SVG has a gray hourglass, extra space, and a delayed-count label
 	const throttled = await (await renderBadge(2315, '👍', 'Like', { throttled: true })).text();
 	assert.ok(!normal.includes('data-throttled'));
 	assert.match(throttled, /data-throttled="true"/);
-	assert.match(throttled, /stroke="#9ca3af"/);
+	assert.ok(throttled.includes(`stroke="${themes.BADGE_THEMES.light.muted}"`));
 	assert.match(throttled, /count updates delayed/);
 	assert.equal(Number(throttled.match(/width="(\d+)"/)[1]), Number(normal.match(/width="(\d+)"/)[1]) + 16);
 	const dotX = Number(throttled.match(/cx="(\d+)"/)[1]);
@@ -160,4 +162,15 @@ test('badge responses are identical within a display range and escape SVG conten
 	assert.ok(!escaped.includes('<unsafe>'));
 	assert.ok(escaped.includes('&quot;&lt;unsafe&gt;'));
 	assert.ok(escaped.includes('&lt;&amp;'));
+});
+
+test('all badge themes use inset borders, readable text, and preserve marker spacing', async () => {
+	for (const [badgeTheme, palette] of Object.entries(themes.BADGE_THEMES)) {
+		const svg = await (await renderBadge(2315, '👍', 'Like', { badgeTheme, throttled: true })).text();
+		assert.ok(svg.includes(`fill="${palette.background}" stroke="${palette.border}"`));
+		assert.ok(svg.includes(`fill="${palette.text}"`));
+		assert.match(svg, /<rect x="0.5" y="0.5" width="[\d.]+" height="23" rx="11.5"/);
+		assert.match(svg, /data-throttled="true"/);
+		assert.match(svg, /cy="12"/);
+	}
 });

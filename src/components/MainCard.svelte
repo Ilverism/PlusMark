@@ -237,6 +237,20 @@
 				</NativeSelect.Root>
 			</Field.Field>
 
+			<Field.Field orientation="vertical" class="gap-1 mt-3">
+				<Field.Label for="badge-theme" class="text-base font-semibold">Badge Theme</Field.Label>
+				<NativeSelect.Root
+					id="badge-theme"
+					value={Manager.badgeTheme}
+					disabled={Manager.isGenerating}
+					onchange={(event) => Manager.setBadgeTheme(event.currentTarget.value)}
+				>
+					<NativeSelect.Option value="light">Light</NativeSelect.Option>
+					<NativeSelect.Option value="dark">Dark</NativeSelect.Option>
+					<NativeSelect.Option value="soft-dark">Soft Dark</NativeSelect.Option>
+				</NativeSelect.Root>
+			</Field.Field>
+
 		</Field.Group>
 
 	</Field.Group>

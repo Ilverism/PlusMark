@@ -166,3 +166,27 @@ test('only displayed count changes queue purges, while exact totals and pending 
 	assert.equal(row().purge_pending, 2);
 	assert.equal((await document.getBadge('like')).reaction.count, 2398);
 });
+
+test('theme edits preserve votes, survive restart, and queue a Camo refresh only when changed', async t => {
+	const f = await fixture(t, async () => 200);
+	await f.document.alarm();
+	const widget = (await f.document.getWidget()).widget;
+	assert.equal(widget.badgeTheme, 'light');
+	const save = (badgeTheme, editTokenHash = 'test') => f.document.saveWidget({
+		widget: { ...widget, badgeTheme }, editTokenHash, createEditTokenHash: 'test'
+	});
+	assert.equal((await save('dark', 'wrong')).ok, false);
+	assert.equal((await f.document.getBadge('like')).badgeTheme, 'light');
+	assert.equal(f.row().purge_pending, 0);
+	for (const badgeTheme of ['dark', 'soft-dark', 'light']) {
+		const before = f.row().purge_pending;
+		assert.equal((await save(badgeTheme)).widget.badgeTheme, badgeTheme);
+		assert.equal(f.row().purge_pending, before + 1);
+		await save(badgeTheme);
+		await save(undefined);
+		assert.equal(f.row().purge_pending, before + 1, 'same theme and old clients do not queue redundant purges');
+		const badge = await f.restart().getBadge('like');
+		assert.equal(badge.badgeTheme, badgeTheme);
+		assert.equal(badge.reaction.count, 1);
+	}
+});

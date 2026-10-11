@@ -28,6 +28,7 @@ export const POST: RequestHandler = async (event) => {
 			doc: parsed.doc,
 			returnUrl: parsed.returnUrl,
 			verifyReferrer: parsed.verifyReferrer,
+			badgeTheme: parsed.badgeTheme,
 			reactions: parsed.reactions
 		},
 		editTokenHash,

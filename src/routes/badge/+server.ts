@@ -1,3 +1,4 @@
+import { badgePalette, type BadgeTheme } from '$lib/badge-theme';
 import type { RequestHandler } from '@sveltejs/kit';
 import { getReactionDocumentStub, parseDocAndReaction } from '$lib/server/reaction-service';
 import { formatReactionCount } from '$lib/reaction-count';
@@ -18,8 +19,8 @@ export const GET: RequestHandler = async (event) => {
 
 	// Cache only throttled snapshots, ahead of the Durable Object lookup. Keep
 	// downstream no-cache headers so Camo does not acquire another freshness delay.
-	const cache = await event.platform?.caches?.open('plusmark-badges-v2').catch(() => undefined);
-	const cacheUrl = new URL('/_plusmark-badge-cache/v2', event.url);
+	const cache = await event.platform?.caches?.open('plusmark-badges-v3').catch(() => undefined);
+	const cacheUrl = new URL('/_plusmark-badge-cache/v3', event.url);
 	cacheUrl.searchParams.set('doc', parsed.doc);
 	cacheUrl.searchParams.set('r', parsed.reaction);
 	const cacheKey = new Request(cacheUrl);
@@ -36,7 +37,7 @@ export const GET: RequestHandler = async (event) => {
 	}
 
 	const colors = await destinationColors(result.returnUrl);
-	const response = svgBadgeResponse(result.reaction.emoji, formatReactionCount(result.reaction.count), 200, result.reaction.label, result.throttled, colors, result.returnUrl);
+	const response = svgBadgeResponse(result.reaction.emoji, formatReactionCount(result.reaction.count), 200, result.reaction.label, result.throttled, colors, result.returnUrl, result.badgeTheme);
 	const ttl = Math.floor((result.refreshAt - Date.now()) / 1000);
 	if (cache && result.throttled && ttl > 0) {
 		const snapshot = response.clone();
@@ -49,7 +50,8 @@ export const GET: RequestHandler = async (event) => {
 	return response;
 };
 
-function svgBadgeResponse(emoji: string, text: string, status: number, label = 'PlusMark reaction', throttled = false, colors?: [string, string], returnUrl = ''): Response {
+function svgBadgeResponse(emoji: string, text: string, status: number, label = 'PlusMark reaction', throttled = false, colors?: [string, string], returnUrl = '', theme: BadgeTheme = 'light'): Response {
+	const palette = badgePalette(theme);
 	const display = `${emoji} ${text}`;
 	const contentWidth = Math.max(54, Math.min(260, 36 + Array.from(text).length * 9));
 	const markerWidth = colors ? 16 : 0;
@@ -69,13 +71,13 @@ function svgBadgeResponse(emoji: string, text: string, status: number, label = '
     <feDropShadow dx="0" dy="0.6" stdDeviation="0.7" flood-color="#000" flood-opacity="0.3"/>
   </filter>
 </defs>
-<rect width="${width}" height="24" rx="12" fill="#f3f4f6"/>
-<g font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" fill="#111827">
+<rect x="0.5" y="0.5" width="${width - 1}" height="23" rx="11.5" fill="${palette.background}" stroke="${palette.border}"/>
+<g font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" fill="${palette.text}">
   <g clip-path="url(#emoji-slot)"><text x="7" y="17" filter="url(#emoji-shadow)">${escapeXml(emoji)}</text></g>
   <g clip-path="url(#count-slot)"><text x="29" y="17">${escapeXml(text)}</text></g>
 </g>
 ${colors ? destinationDot(colors, width - 12) : ''}
-${throttled ? `<g data-throttled="true" transform="translate(${width - markerWidth - 15} 6)" fill="none" stroke="#9ca3af" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+${throttled ? `<g data-throttled="true" transform="translate(${width - markerWidth - 15} 6)" fill="none" stroke="${palette.muted}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M1 0h8M1 12h8M2 0v2c0 2 6 6 6 8v2M8 0v2c0 2-6 6-6 8v2"/>
   <path d="M3 10h4"/>
 </g>` : ''}

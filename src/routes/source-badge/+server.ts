@@ -13,7 +13,7 @@ export const GET: RequestHandler = async (event) => {
 	const url = new URL(returnUrl);
 	const fullLabel = `${url.host}${url.pathname === '/' ? '' : url.pathname}${url.search}${url.hash}`;
 	const chars = Array.from(fullLabel);
-	const label = chars.length > 48 ? `${chars.slice(0, 23).join('')}…${chars.slice(-24).join('')}` : fullLabel;
+	const label = `↩ ${chars.length > 48 ? `${chars.slice(0, 23).join('')}…${chars.slice(-24).join('')}` : fullLabel}`;
 	// A 10px monospace label uses 6px cells without stretching the glyphs.
 	const textWidth = Array.from(label).length * 6;
 	const width = 29 + textWidth + 24;

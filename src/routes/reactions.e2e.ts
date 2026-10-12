@@ -146,15 +146,20 @@ test('verification rejects a fake token and permits an explicit retry without an
 	await request.post('/api/widgets', { data: { doc, returnUrl: 'https://example.com/', reactions: [{ id: 'like', emoji: '👍', label: 'Like', description: '' }] } });
 	await page.route('https://challenges.cloudflare.com/turnstile/v0/api.js*', route => route.fulfill({
 		contentType: 'text/javascript', body: `window.turnstile = {
-			render(selector, options) { this.options=options; setTimeout(()=>options.callback('invalid-test-token'),0); return 'test'; },
+			render(selector, options) { this.options=options; window.verifyReaction = () => options.callback('invalid-test-token'); return 'test'; },
 			reset() { setTimeout(()=>this.options.callback('invalid-test-token'),0); }
 		};`
 	}));
 	let posts = 0;
 	page.on('request', req => { if (req.method() === 'POST' && req.url().includes('/react?')) posts++; });
 	await page.goto(`/react?doc=${doc}&r=like`);
+	await page.waitForFunction(() => 'verifyReaction' in window);
+	await expect(page.locator('form button')).toBeHidden();
+	expect(posts).toBe(0);
+	await page.evaluate(() => (window as unknown as { verifyReaction: () => void }).verifyReaction());
 	await expect(page.getByRole('status')).toContainText('Verification failed', { timeout: 15000 });
 	const retry = page.getByRole('button', { name: 'Try again' });
+	await expect(retry).toBeVisible();
 	await expect(retry).toBeEnabled();
 	expect(posts).toBe(1);
 	await retry.click();

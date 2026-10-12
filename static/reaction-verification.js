@@ -23,7 +23,7 @@ async function submit(event) {
 		status.textContent = error.message;
 		busy = false;
 		automatic = false;
-		button.textContent = 'Try again';
+		button.hidden = false;
 		if (widget !== undefined) {
 			token = '';
 			window.turnstile.reset(widget);

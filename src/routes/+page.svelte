@@ -142,14 +142,14 @@
 
 		@apply flex flex-col items-center gap-4;
 
-		@apply scroll-fade;
+		/* @apply scroll-fade;
 
 		@apply max-h-[50dvh];
 		@apply h-[50dvh];
 		@apply overflow-y-auto;
 		@apply overflow-x-clip;
 		@apply p-32;
-		@apply -m-32;
+		@apply -m-32; */
 
 	}
 

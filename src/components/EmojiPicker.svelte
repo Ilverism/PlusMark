@@ -1,6 +1,6 @@
 <!-- src/components/EmojiPicker.svelte -->
 <script module lang="ts">
-    import type { EmojiCategory } from "$lib/emoji";
+    import type { EmojiCategory, EmojiEntry } from "$lib/emoji";
 	let cachedCategories: EmojiCategory[] = [];
 </script>
 
@@ -83,9 +83,16 @@
 		}
 	};
 
-	const selectEmoji = (selectedEmoji: string) => {
+	const selectEmoji = (entry: EmojiEntry) => {
 
-		Manager.reactionEmojiEditing!.emoji = selectedEmoji;
+		const reaction = Manager.reactionEmojiEditing;
+		if (!reaction) return;
+		const currentEmoji = allEmojis.find(emoji => emoji.emoji === reaction.emoji);
+		const currentName = reaction.name.trim().toLowerCase();
+		if (!currentName || currentName === currentEmoji?.name.toLowerCase()) {
+			reaction.name = entry.name.replace(/(^|[\s-])\p{L}/gu, word => word.toUpperCase());
+		}
+		reaction.emoji = entry.emoji;
 		Manager.markDirty();
 		search = "";
 		
@@ -214,7 +221,7 @@
 							class="reaction-card-emoji-option group"
 							aria-label={entry.name}
 							title={entry.name}
-							onclick={() => selectEmoji(entry.emoji)}
+							onclick={() => selectEmoji(entry)}
 						>
 							<div class="reaction-card-emoji-option-icon">
 								{entry.emoji}

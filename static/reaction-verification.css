@@ -50,7 +50,7 @@ main {
 	border-bottom: 4px solid var(--surface-edge);
 	filter: drop-shadow(0 9px 7px color-mix(in oklab, var(--warm-shadow) 15%, transparent));
 }
-h1 { font-size: 1.5rem; overflow-wrap: anywhere; }
+h1 { font-size: 1.5rem; overflow-wrap: anywhere; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
 a { color: inherit; }
 a:hover { color: var(--accent); }
 button { padding: .65rem 1.25rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--control); color: var(--foreground); font: inherit; cursor: pointer; }
@@ -58,6 +58,28 @@ button:enabled:hover { background: var(--accent); color: var(--accent-foreground
 button:focus-visible, a:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 button:disabled { opacity: .6; cursor: default; }
 #challenge { margin-block: 1rem; }
+#return-link {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5rem;
+}
+small {
+	opacity: 50%;
+}
+sup {
+	margin-left: auto;
+	margin-top: 1rem;
+}
+form {
+	width: 100%;
+	display: flex;
+}
+code {
+	background-color: var(--background);
+	padding: 0.25rem 0.5rem;
+	border-radius: 0.25rem;
+}
 @media (prefers-color-scheme: dark) {
 	:root {
 		--background: oklch(14.5% 0 0); /* neutral-950 */

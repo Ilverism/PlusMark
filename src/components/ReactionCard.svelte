@@ -3,7 +3,6 @@
 	import { Input } from "$lib/components/ui/input";
 	import Manager from "$lib/Manager.svelte";
 	import { __reaction_description_placeholder, __reaction_name_placeholder } from "$lib/paraglide/messages";
-	import { untrack } from "svelte";
 	import { cubicOut } from "svelte/easing";
 	import { fly } from "svelte/transition";
 	import Reaction from "../Reaction.svelte";
@@ -23,17 +22,10 @@
 	const reactionRemovalAllowed = $derived(Manager.reactions.length > 1);
 	const nameInvalid = $derived(Manager.hasAttemptedGenerate && !reaction.name.trim());
 
-	$effect(() => {
-
-		reaction.description;
-		reaction.name;
-
-		// Close the emoji picker after editing any reaction's name or description
-		untrack(() => {
-			Manager.reactionEmojiPickerOpen = false;
-		});
-
-	});
+	const editReaction = () => {
+		Manager.markDirty();
+		Manager.closeEmojiPicker();
+	};
 
 </script>
 
@@ -54,7 +46,7 @@
 			aria-invalid={nameInvalid}
 			aria-describedby={nameInvalid ? `reaction-name-error-${reaction.uuid}` : undefined}
 			bind:value={reaction.name}
-			oninput={() => Manager.markDirty()}
+			oninput={editReaction}
 			placeholder={__reaction_name_placeholder()}
 		/>
 		{#if nameInvalid}
@@ -64,7 +56,7 @@
 			class="text-muted-foreground"
 			aria-label={__reaction_description_placeholder()}
 			bind:value={reaction.description}
-			oninput={() => Manager.markDirty()}
+			oninput={editReaction}
 			placeholder={__reaction_description_placeholder()}
 		/>
 	</div>

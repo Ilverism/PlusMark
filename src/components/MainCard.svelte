@@ -93,9 +93,9 @@
 			<p id="return-url-error" class="text-sm text-destructive" role="alert">Enter a valid http:// or https:// URL.</p>
 		{/if}
 
-		<!-- Content ID -->
+		<!-- Content ID & Reaction Group ID -->
 		<Field.Field class="gap-1">
-			<Field.Label for="content-id" class="text-base font-semibold">Content ID</Field.Label>
+			<Field.Label for="content-id" class="text-base font-semibold">Content ID <small class="font-normal">&</small> Reaction Group ID</Field.Label>
 			<div class="flex items-center">
 				<Input
 					id="content-id"
@@ -136,16 +136,9 @@
 
 				</div>
 
-				{@render questionIndicator("A unique identifier for the content these reactions belong to.")}
+				{@render questionIndicator("Content ID: A unique identifier for the content these reactions belong to.")}
 			</div>
-		</Field.Field>
-		{#if Manager.contentIdInvalid}
-			<p id="content-id-error" class="text-sm text-destructive" role="alert">Enter a Content ID containing letters or numbers.</p>
-		{/if}
 
-		<!-- Reaction Group ID -->
-		<Field.Field class="gap-1">
-			<Field.Label for="reaction-group-id" class="text-base font-semibold">Reaction Group ID</Field.Label>
 			<div class="flex items-center gap-0">
 				<Input
 					id="reaction-group-id"
@@ -185,43 +178,46 @@
 
 				</div>
 
-				{@render questionIndicator("Helps to identify distinct reaction groups that appear on the same page or in the same document.")}
+				{@render questionIndicator("Reaction Group ID: A unique identifier for the group of reactions.")}
 
 			</div>
 			<p id="reaction-group-error" class="text-sm text-destructive" role="alert">{Manager.groupIdInvalid ? 'Use up to 32 letters, numbers, or single separating dashes. Shorten the Content ID so the combined ID fits within 120 characters.' : ''}</p>
 		</Field.Field>
+		{#if Manager.contentIdInvalid}
+			<p id="content-id-error" class="text-sm text-destructive" role="alert">Enter a Content ID containing letters or numbers.</p>
+		{/if}
 
 		<!-- Secondary Options -->
-		<Field.Group class="gap-0.5! **:data-[slot='field-label']:before:content-['•'] **:before:opacity-25">
+		<Field.Group class="gap-0.5! **:data-[slot='field-label']:before:content-['•'] **:before:text-muted **:dark:before:text-muted-foreground">
 
 			<!-- Check reaction source -->
 			<Field.Field class="gap-1">
 				<div class="flex items-center gap-2">
-					<Field.Label for="verify-referrer" class="text-base font-semibold">Reject votes from other URLs</Field.Label>
 					<Checkbox id="verify-referrer" checked={Manager.verifyReferrer} aria-describedby="verify-referrer-help"
 						onCheckedChange={(checked) => Manager.setVerifyReferrer(checked)} />
+					<Field.Label for="verify-referrer" class="text-base font-semibold">Reject votes from other URLs</Field.Label>
 				</div>
 			</Field.Field>
 
 			<!-- Include source badge -->
 			<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
-				<Field.Label for="include-source-badge" class="text-base font-semibold">Include source badge</Field.Label>
 				<Checkbox id="include-source-badge" checked={Manager.includeSourceBadge}
 					onCheckedChange={(checked) => Manager.setIncludeSourceBadge(checked)} />
+				<Field.Label for="include-source-badge" class="text-base font-semibold">Include source badge</Field.Label>
 			</Field.Field>
 
 			<!-- Include ID tag -->
 			<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
-				<Field.Label for="include-id-tag" class="text-base font-semibold">Include ID tag</Field.Label>
 				<Checkbox id="include-id-tag" checked={Manager.includeIdTag}
 					onCheckedChange={(checked) => Manager.setIncludeIdTag(checked)} />
+				<Field.Label for="include-id-tag" class="text-base font-semibold">Include ID tag</Field.Label>
 			</Field.Field>
 
 			<!-- Include PlusMark badge -->
 			<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
-				<Field.Label for="include-badge" class="text-base font-semibold">Include PlusMark badge</Field.Label>
 				<Checkbox id="include-badge" checked={Manager.includePlusMarkBadge}
 					onCheckedChange={(checked) => Manager.setIncludePlusMarkBadge(checked)} />
+				<Field.Label for="include-badge" class="text-base font-semibold">Include PlusMark badge</Field.Label>
 			</Field.Field>
 
 		</Field.Group>

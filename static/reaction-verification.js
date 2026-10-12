@@ -11,7 +11,7 @@ async function submit(event) {
 	if (busy || document.prerendering) return;
 	busy = true;
 	button.disabled = true;
-	status.textContent = 'Recording your reaction…';
+	status.textContent = '• Recording your reaction…';
 	try {
 		const body = new URLSearchParams(new FormData(form));
 		body.set('cf-turnstile-response', token);
@@ -20,7 +20,7 @@ async function submit(event) {
 		if (!response.ok) throw new Error(result.message || result.error || 'Your reaction could not be recorded. Please try again.');
 		location.replace(result.returnUrl);
 	} catch (error) {
-		status.textContent = error.message;
+		status.textContent = '• ' + error.message;
 		busy = false;
 		automatic = false;
 		button.hidden = false;
@@ -44,11 +44,11 @@ function start() {
 				if (automatic) void submit();
 				else button.disabled = false;
 			},
-			'error-callback': () => { status.textContent = 'Verification is unavailable. Please reload to try again.'; },
+			'error-callback': () => { status.textContent = '• Verification is unavailable. Please reload to try again.'; },
 			'expired-callback': () => { token = ''; window.turnstile.reset(widget); }
 		});
 	};
-	script.onerror = () => { status.textContent = 'Verification could not load. Please allow Cloudflare Turnstile and reload.'; };
+	script.onerror = () => { status.textContent = '• Verification could not load. Please allow Cloudflare Turnstile and reload.'; };
 	document.head.append(script);
 }
 if (document.prerendering) document.addEventListener('prerenderingchange', start, { once: true });

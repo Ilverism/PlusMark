@@ -5,7 +5,7 @@ import { reactionPage } from '$lib/server/reaction-page';
 export const GET: RequestHandler = ({ url }) => {
 	if (!dev) error(404, 'Not found');
 	return new Response(reactionPage({
-		action: '/react/preview', ticket: '', ticketId: '', siteKey: '',
+		doc: 'example-content-g-0123456789abcdef', action: '/react/preview', ticket: '', ticketId: '', siteKey: '',
 		verified: url.searchParams.get('verified') === '1',
 		returnUrl: '/', label: '👍 Thumbs Up', preview: true
 	}), {

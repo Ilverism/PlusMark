@@ -60,7 +60,7 @@ export const GET: RequestHandler = async (event) => {
 	const verified = await hasVerificationPass(secret, event.cookies.get(VERIFIED_COOKIE) ?? '', visitor);
 	return new Response(reactionPage({
 		action: event.url.pathname + event.url.search, ticket, ticketId: claim.id, siteKey: config.siteKey,
-		verified, returnUrl: result.widget.returnUrl, label: `${selected.emoji} ${selected.label}`
+		doc, verified, returnUrl: result.widget.returnUrl, label: `${selected.emoji} ${selected.label}`
 	}), { headers: PAGE_HEADERS });
 };
 

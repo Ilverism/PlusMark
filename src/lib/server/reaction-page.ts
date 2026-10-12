@@ -1,6 +1,6 @@
 export const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
 
-export function reactionPage(options: { action: string; ticket: string; ticketId: string; siteKey: string; verified: boolean; returnUrl: string; label: string; preview?: boolean }) {
+export function reactionPage(options: { doc: string; action: string; ticket: string; ticketId: string; siteKey: string; verified: boolean; returnUrl: string; label: string; preview?: boolean }) {
 	return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>React — PlusMark</title><link rel="stylesheet" href="/reaction-verification.css">${options.preview ? '' : '<script src="/reaction-verification.js" defer></script>'}</head><body><div class="background-pattern" aria-hidden="true"></div>
 	<main>
 		<h1>${escapeHtml(options.label)}</h1>
@@ -10,8 +10,8 @@ export function reactionPage(options: { action: string; ticket: string; ticketId
 			<input type="hidden" name="ticket" value="${escapeHtml(options.ticket)}">
 			<div id="challenge"></div>
 			<button type="submit" hidden disabled>Try again</button>
-			<sup><sub><code>xyz123</code></sub></sup>
 		</form>
+		<sup><sub><code>${escapeHtml(options.doc)}</code></sub></sup>
 	</main>
 	<noscript>
 		<p>JavaScript is required to verify and record your reaction.</p>

@@ -79,10 +79,11 @@ button {
 	font: inherit;
 	font-weight: 600;
 	cursor: pointer;
-	transition: scale .15s;
+	transition: transform .15s;
 }
+button[hidden] { display: none; }
 button svg { flex-shrink: 0; }
-button:enabled:hover { background: var(--accent); color: var(--accent-foreground); scale: 1.05; }
+button:enabled:hover { background: var(--accent); color: var(--accent-foreground); transform: translate(-50%, 50%) scale(1.05); }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 button:disabled { opacity: .6; cursor: default; }

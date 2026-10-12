@@ -9,7 +9,7 @@ const verified = form.dataset.verified === 'true';
 function ready() {
 	if (busy) return;
 	button.disabled = false;
-	status.textContent = '• Ready. Press Submit reaction to record your vote.';
+	status.textContent = '• Ready. Press Submit Reaction to record your vote.';
 }
 
 async function submit(event) {
@@ -17,6 +17,7 @@ async function submit(event) {
 	if (busy || document.prerendering || (!verified && !token)) return;
 	busy = true;
 	button.disabled = true;
+	button.hidden = true;
 	status.textContent = '• Recording your reaction…';
 	try {
 		const body = new URLSearchParams(new FormData(form));
@@ -28,6 +29,7 @@ async function submit(event) {
 	} catch (error) {
 		status.textContent = '• ' + error.message;
 		busy = false;
+		button.hidden = false;
 		if (widget !== undefined) {
 			token = '';
 			window.turnstile.reset(widget);

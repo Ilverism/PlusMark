@@ -43,13 +43,22 @@ try {
 	}));
 	const base = `http://127.0.0.1:${server.address().port}`;
 	const settle = () => page.waitForTimeout(200);
-	const button = page.getByRole('button', { name: 'Submit reaction' });
+	const button = page.getByRole('button', { name: /Submit reaction/i });
 	await page.goto(`${base}/react?verified=1`);
 	await settle();
 	assert.equal(posts, 0, 'an existing verification pass must not auto-submit');
 	assert.equal(await button.isEnabled(), true);
+	const initialButton = await button.boundingBox();
+	await button.hover();
+	await settle();
+	const hoveredButton = await button.boundingBox();
+	assert.ok(hoveredButton.width > initialButton.width, 'hover grows the button');
+	for (const [position, size] of [['x', 'width'], ['y', 'height']]) {
+		assert.ok(Math.abs(initialButton[position] + initialButton[size] / 2 - hoveredButton[position] - hoveredButton[size] / 2) < 1, 'hover keeps the button centered');
+	}
 	await button.focus();
 	await page.keyboard.press('Enter');
+	assert.equal(await button.isHidden(), true, 'button disappears during submission');
 	await page.waitForURL('**/done');
 	assert.equal(posts, 1, 'keyboard confirmation submits once');
 	await page.goto(`${base}/react?verified=1`);
@@ -75,6 +84,7 @@ try {
 	await button.click();
 	await page.waitForFunction(() => document.querySelector('#status').textContent.includes('Test rejection'));
 	assert.equal(posts, 2);
+	assert.equal(await button.isVisible(), true, 'button reappears after a failed submission');
 	assert.equal(await button.isDisabled(), true);
 	await page.evaluate(() => window.challenge.callback('retry-token'));
 	await settle();

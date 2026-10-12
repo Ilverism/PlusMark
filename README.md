@@ -81,7 +81,7 @@ All GET requests are now read-only for votes. Existing badge links open a small
 verification page. Managed Cloudflare Turnstile runs on the first click, and the
 server validates its token, exact hostname, action, and submission ID before
 accepting a POST. Successful verification sets a signed, HttpOnly cookie for one
-hour. Every reaction requires pressing **Submit reaction** on the verification
+hour. Every reaction requires pressing **Submit Reaction** on the verification
 page, including when that cookie skips another challenge. Completing Turnstile
 only enables the button; it never submits a vote. The existing visitor cookie still identifies
 the vote, so verification expiry does not prevent removing an earlier vote.

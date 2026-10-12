@@ -39,7 +39,7 @@
 	<ReactionCardEmoji reaction={reaction} />
 
 	<!-- Content -->
-	<div>
+	<div class="min-w-0 flex-1">
 		<Input
 			class="text-xl font-semibold mb-2"
 			aria-label={__reaction_name_placeholder()}

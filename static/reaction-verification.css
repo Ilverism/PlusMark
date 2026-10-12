@@ -43,10 +43,13 @@ body { margin: 0; min-height: 100svh; display: grid; place-items: center; isolat
 	.background-pattern::before { animation: none; }
 }
 main {
+	position: relative;
+	box-sizing: border-box;
 	display: flex;
 	flex-direction: column;
-	width: min(28rem, calc(100% - 4rem));
-	padding: 2rem;
+	width: min(32rem, calc(100% - 2rem));
+	margin-block: 2rem;
+	padding: 2rem 2rem 3rem;
 	border-radius: 1rem;
 	background: var(--card);
 	border-bottom: 4px solid var(--surface-edge);
@@ -55,8 +58,32 @@ main {
 h1 { font-size: 1.5rem; overflow-wrap: anywhere; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
 a { color: inherit; }
 a:hover { color: var(--accent); }
-button { padding: .65rem 1.25rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--control); color: var(--foreground); font: inherit; cursor: pointer; }
-button:enabled:hover { background: var(--accent); color: var(--accent-foreground); }
+button {
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	transform: translate(-50%, 50%);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: .5rem;
+	width: max-content;
+	max-width: calc(100% - 2rem);
+	min-height: 44px;
+	padding: .5rem 1rem;
+	border: 0;
+	border-radius: 9999px;
+	box-shadow: 0 0 0 4px var(--surface-edge);
+	background: var(--control);
+	color: var(--foreground);
+	font: inherit;
+	font-weight: 600;
+	cursor: pointer;
+	transition: scale .15s;
+}
+button svg { flex-shrink: 0; }
+button:enabled:hover { background: var(--accent); color: var(--accent-foreground); scale: 1.05; }
+@media (prefers-reduced-motion: reduce) { button { transition: none; } }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 button:disabled { opacity: .6; cursor: default; }
 #challenge { margin-block: 1rem; }
@@ -65,6 +92,9 @@ button:disabled { opacity: .6; cursor: default; }
 	flex-direction: column;
 	align-items: center;
 	gap: 0.5rem;
+	max-width: calc(100% - 2rem);
+	text-align: center;
+	overflow-wrap: anywhere;
 }
 small {
 	opacity: 50%;
@@ -74,6 +104,7 @@ sup {
 	margin-top: 1rem;
 }
 code {
+	overflow-wrap: anywhere;
 	background-color: var(--background);
 	padding: 0.25rem 0.5rem;
 	border-radius: 0.25rem;

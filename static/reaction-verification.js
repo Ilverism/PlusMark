@@ -4,11 +4,17 @@ const button = form.querySelector('button');
 let busy = false;
 let token = '';
 let widget;
-let automatic = true;
+const verified = form.dataset.verified === 'true';
+
+function ready() {
+	if (busy) return;
+	button.disabled = false;
+	status.textContent = '• Ready. Press Submit reaction to record your vote.';
+}
 
 async function submit(event) {
 	event?.preventDefault();
-	if (busy || document.prerendering) return;
+	if (busy || document.prerendering || (!verified && !token)) return;
 	busy = true;
 	button.disabled = true;
 	status.textContent = '• Recording your reaction…';
@@ -22,8 +28,6 @@ async function submit(event) {
 	} catch (error) {
 		status.textContent = '• ' + error.message;
 		busy = false;
-		automatic = false;
-		button.hidden = false;
 		if (widget !== undefined) {
 			token = '';
 			window.turnstile.reset(widget);
@@ -33,7 +37,7 @@ async function submit(event) {
 
 form.addEventListener('submit', submit);
 function start() {
-	if (form.dataset.verified === 'true') { void submit(); return; }
+	if (verified) { ready(); return; }
 	const script = document.createElement('script');
 	script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 	script.onload = () => {
@@ -41,11 +45,21 @@ function start() {
 			sitekey: form.dataset.siteKey, action: 'reaction', cData: form.dataset.ticketId,
 			callback: value => {
 				token = value;
-				if (automatic) void submit();
-				else button.disabled = false;
+				ready();
 			},
-			'error-callback': () => { status.textContent = '• Verification is unavailable. Please reload to try again.'; },
-			'expired-callback': () => { token = ''; window.turnstile.reset(widget); }
+			'error-callback': () => {
+				token = '';
+				button.disabled = true;
+				if (!busy) status.textContent = '• Verification is unavailable. Please reload to try again.';
+			},
+			'expired-callback': () => {
+				token = '';
+				button.disabled = true;
+				if (!busy) {
+					status.textContent = '• Verification expired. Complete the security check again before submitting.';
+					window.turnstile.reset(widget);
+				}
+			}
 		});
 	};
 	script.onerror = () => { status.textContent = '• Verification could not load. Please allow Cloudflare Turnstile and reload.'; };

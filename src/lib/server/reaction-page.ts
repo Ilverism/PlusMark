@@ -4,12 +4,15 @@ export function reactionPage(options: { doc: string; action: string; ticket: str
 	return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>React — PlusMark</title><link rel="stylesheet" href="/reaction-verification.css">${options.preview ? '' : '<script src="/reaction-verification.js" defer></script>'}</head><body><div class="background-pattern" aria-hidden="true"></div>
 	<main>
 		<h1>${escapeHtml(options.label)}</h1>
-		<p id="status" role="status" aria-live="polite">${options.verified ? '• Recording your reaction…' : '• Complete the security check to record your reaction.'}</p>
-		<span>• You will be automatically redirected to the Return URL upon completion (press <b>Esc</b> to cancel).</span>
+		<p id="status" role="status" aria-live="polite">${options.verified ? '• Ready. Press Submit reaction to record your vote.' : '• Complete the security check, then press Submit reaction.'}</p>
+		<span>• Submitting adds or removes your reaction, then returns you to the source page.</span>
 		<form method="post" action="${escapeHtml(options.action)}" data-verified="${options.verified}" data-site-key="${escapeHtml(options.siteKey)}" data-ticket-id="${options.ticketId}">
 			<input type="hidden" name="ticket" value="${escapeHtml(options.ticket)}">
 			<div id="challenge"></div>
-			<button type="submit" hidden disabled>Try again</button>
+			<button type="submit"${options.preview && options.verified ? '' : ' disabled'}>
+				<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4Z"/></svg>
+				Submit reaction
+			</button>
 		</form>
 		<sup><sub><code>${escapeHtml(options.doc)}</code></sub></sup>
 	</main>
@@ -18,6 +21,6 @@ export function reactionPage(options: { doc: string; action: string; ticket: str
 	</noscript>
 	<p id="return-link">
 		<a href="${escapeHtml(options.returnUrl)}" rel="noreferrer">↩ Return immediately: '${escapeHtml(options.returnUrl)}'</a>
-		<small>(Your vote may be discarded if you return early)</small>
+		<small>No vote is changed until you submit.</small>
 	</p></body></html>`;
 }

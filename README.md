@@ -81,8 +81,9 @@ All GET requests are now read-only for votes. Existing badge links open a small
 verification page. Managed Cloudflare Turnstile runs on the first click, and the
 server validates its token, exact hostname, action, and submission ID before
 accepting a POST. Successful verification sets a signed, HttpOnly cookie for one
-hour. Subsequent clicks automatically POST and return to the source page without
-another challenge during that hour. The existing visitor cookie still identifies
+hour. Every reaction requires pressing **Submit reaction** on the verification
+page, including when that cookie skips another challenge. Completing Turnstile
+only enables the button; it never submits a vote. The existing visitor cookie still identifies
 the vote, so verification expiry does not prevent removing an earlier vote.
 
 POSTs require a same-origin request and a signed, visitor-bound ticket valid for
@@ -94,7 +95,8 @@ public and require no Turnstile check. JavaScript and cookies are required to vo
 Existing URLs, votes, and edit tokens are preserved; direct GET-based voting API
 clients must move to the verified flow. Previous automated votes are not removed.
 Turnstile reduces automated voting but does not guarantee a unique human or stop
-every browser scanner, especially one using an already-verified browser session.
+every browser scanner. Explicit submission prevents passive page loads from voting,
+but automation that deliberately submits the form may still vote.
 
 The public `TURNSTILE_SITE_KEY` and exact production `TURNSTILE_HOSTNAME` live in
 `wrangler.jsonc`. Store `TURNSTILE_SECRET` in the Worker secret binding and ignored
@@ -111,10 +113,12 @@ Validation: `node --test scripts/test-reaction-verification.mjs`,
 CSRF, replay protection, legacy data, and persisted production SQLite receipts.
 Browser tests cover the verification page, rejected tokens, retry handling, and
 read-only link visits. A real-widget browser check is also needed after deployment.
+`node scripts/test-reaction-page.mjs` checks explicit confirmation with a mocked
+widget, pass reuse, expiry, retries, keyboard activation, and responsive layout.
 
 For styling, open `/react/preview` on the Vite dev server (for example,
-`http://localhost:4000/react/preview`). Add `?verified=1` to preview the submitting
-message. Both use the real page markup and `static/reaction-verification.css`;
+`http://localhost:4000/react/preview`). Add `?verified=1` to preview the ready
+message and enabled button. Both use the real page markup and `static/reaction-verification.css`;
 refresh after edits. This static preview loads no Turnstile, creates no votes,
 and stays on screen. It requires no keys or saved reaction group and returns 404
 in production builds, including `pnpm preview`.

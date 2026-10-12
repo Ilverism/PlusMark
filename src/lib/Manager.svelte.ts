@@ -205,7 +205,10 @@ class Manager {
 		this.preferencesLoaded = true;
 		this.reactionGroupId = createReactionGroupId();
 		this.loadBadgePreference();
+		this.badgeTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 		try {
+			const theme = localStorage.getItem('plusmark:theme');
+			if (theme === 'light' || theme === 'dark') this.badgeTheme = theme;
 			// Preserve only the checkbox preference from the retired draft format.
 			const oldDraft = localStorage.getItem('plusmark:reaction-draft:v1');
 			if (localStorage.getItem(SOURCE_PREFERENCE_KEY) === null && oldDraft) {

@@ -15,7 +15,7 @@
 	let { children } = $props();
 </script>
 
-<ModeWatcher defaultMode="light" modeStorageKey="plusmark:theme" />
+<ModeWatcher defaultMode="system" modeStorageKey="plusmark:theme" />
 <Toaster position="bottom-right" closeButton duration={8000} />
 
 <!-- Background -->

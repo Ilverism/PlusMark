@@ -252,6 +252,7 @@ export class ReactionDocument extends DurableObject<Env> {
 
 	async toggleReaction(reactionId: string, voterHash: string, referrer: string | null = null, submission?: { id: string; expiresAt: number }): Promise<ToggleSuccess | RpcFailure> {
 		let badgeChanged = false;
+		let changedDoc: string | null = null;
 		const result = this.ctx.storage.transactionSync(() => {
 			// Receipt and vote commit together, including concurrent retries and object restarts.
 			if (submission) {
@@ -343,7 +344,15 @@ export class ReactionDocument extends DurableObject<Env> {
 				submission.id, voterHash, reactionId, JSON.stringify(receipt), submission.expiresAt
 			);
 			this.statistics.recordVote();
+			changedDoc = widget.doc;
 			return receipt;
+		});
+
+		// Only emit after commit; replayed receipts and rejected submissions never reach this log.
+		if (result.ok && changedDoc !== null) console.log({
+			event: 'reaction.vote', at: new Date().toISOString(), doc: changedDoc,
+			reaction: reactionId, voter: voterHash, submissionId: submission?.id ?? null,
+			active: result.active, count: result.count
 		});
 
 		if (result.ok && badgeChanged) {

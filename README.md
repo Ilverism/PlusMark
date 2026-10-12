@@ -119,6 +119,39 @@ refresh after edits. This static preview loads no Turnstile, creates no votes,
 and stays on screen. It requires no keys or saved reaction group and returns 404
 in production builds, including `pnpm preview`.
 
+## Passive vote diagnostics
+
+Workers Logs persist structured `reaction.request` and `reaction.vote` events with
+100% head sampling. Automatic invocation logs are disabled so routine badge image
+loads do not fill the log store. No database migration or voting rule is changed.
+
+`reaction.request` covers verification-page GETs and vote POSTs, including rejected
+requests. It records the processing phase and HTTP status, group/reaction IDs,
+submission ID, whether verification used Turnstile or the one-hour pass, browser
+signature, Fetch Metadata headers, and Cloudflare network/ASN/country information.
+Bot scores are included only when Cloudflare provides them. Source URLs omit
+credentials, query strings, and fragments; missing referrers remain unknown.
+These signals help investigate scanners, but do not establish a person's identity.
+Custom audit fields exclude raw IPs, cookies, request bodies, and verification tokens.
+
+`reaction.vote` is emitted by the Durable Object only after a vote transaction
+commits, before cache-purge work. `active: true` means added, `false` means removed;
+`count` is the resulting total. Replayed tickets produce no additional committed-vote
+event. Match `submissionId` to the request events to identify the verification path
+and source metadata. `voter` is the existing per-document HMAC, not the visitor cookie.
+An accepted request alone may be a retry; count committed events instead.
+
+In Cloudflare, open **Workers & Pages → plusmark → Logs**, choose the last two hours,
+filter `event` to `reaction.vote`, and filter `doc` to the affected full group ID.
+Look up its `submissionId` in `reaction.request` events. Repeated additions from
+different voter hashes with the same browser/network are worth investigating, but
+are not automatically classified as abuse. Collection continues without a local
+terminal. The [documented retention](https://developers.cloudflare.com/workers/observability/logs/workers-logs/#pricing)
+is three days on Free and seven on Paid as of October 2026, subject to plan limits.
+Logs are diagnostic evidence, not a transactional audit database: platform logging
+limits or process failures can still leave gaps. Set `observability.enabled` to
+`false` and redeploy to stop retained logging after investigation.
+
 ## Badge appearance and counts
 
 Reaction badges include a two-color destination dot derived from the normalized,

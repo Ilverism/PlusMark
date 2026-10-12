@@ -14,8 +14,11 @@ const dispatch = `export default {async fetch(request,env) {
 }};`;
 const bundle = await build({
 	stdin: { contents: `import { ReactionDocument as BaseDocument } from './src/lib/server/reaction-document.ts';
+const auditLogs = [];
+console.log = value => { if (value?.event === 'reaction.vote') auditLogs.push(value); };
 export class ReactionDocument extends BaseDocument {
  getStatistics() { return this.ctx.storage.sql.exec('SELECT reactions, votes FROM statistics').one(); }
+ getAuditLogs() { return auditLogs; }
 }\n${dispatch}`, resolveDir: root, loader: 'ts' },
 	bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', external: ['cloudflare:workers']
 });
@@ -76,10 +79,15 @@ try {
 	const submission = { id: crypto.randomUUID(), expiresAt: Date.now() + 600_000 };
 	const retries = await Promise.all(Array.from({ length: 8 }, () => rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', 'https://example.com/', submission)));
 	assert.ok(retries.every(result => result.ok && result.count === 1 && result.active));
+	const committedLogs = (await rpc('doc-g-first', 'getAuditLogs')).filter(log => log.submissionId === submission.id);
+	assert.equal(committedLogs.length, 1, 'concurrent receipt retries must log only one committed vote');
+	assert.equal(committedLogs[0].doc, 'doc-g-first');
+	assert.equal(committedLogs[0].count, 1);
 	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'other-user', null, submission)).status, 409);
 	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', null, { id: 'expired', expiresAt: Date.now() - 1 })).status, 410);
 	await mf.setOptions({ ...options, script: bundle.outputFiles[0].text + '\n// restart' });
 	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', null, submission)).count, 1);
+	assert.equal((await rpc('doc-g-first', 'getAuditLogs')).length, 0, 'receipt replay after restart is not a new vote');
 	assert.equal((await rpc('doc-g-first', 'getBadge', 'like')).reaction.count, 1);
 	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', null, { ...submission, id: crypto.randomUUID() })).count, 0);
 	assert.equal((await rpc('doc-g-first', 'getWidget')).widget.verifyReferrer, true);

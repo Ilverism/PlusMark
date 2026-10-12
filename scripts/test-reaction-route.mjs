@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 const { build } = createRequire(require.resolve('wrangler'))('esbuild');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const bundle = await build({
-	stdin: { contents: `export * from './src/routes/react/+server.ts'; export * from './src/lib/server/reaction-service.ts'; export * from './src/lib/server/reaction-verification.ts';`, resolveDir: root, loader: 'ts' },
+	stdin: { contents: `export * from './src/routes/react/+server.ts'; export * from './src/lib/server/reaction-service.ts'; export * from './src/lib/server/reaction-verification.ts'; export * from './src/lib/server/reaction-audit.ts';`, resolveDir: root, loader: 'ts' },
 	bundle: true, write: false, format: 'esm', platform: 'node', target: 'es2022',
 	plugins: [{ name: 'test-environment', setup(build) {
 		build.onResolve({ filter: /^\$(app\/environment|env\/dynamic\/private)$/ }, args => ({ path: args.path, namespace: 'test' }));
@@ -32,6 +32,9 @@ const ticketFrom = response => response.text().then(html => {
 const post = (ticket, overrides = {}) => api.POST(event('POST', new URLSearchParams({ ticket, 'cf-turnstile-response': overrides.token ?? 'token' }), { origin: 'https://plusmark.example', accept: 'application/json', ...overrides.headers }, overrides.jar, overrides.query));
 const rejects = (fn, status) => assert.rejects(fn, err => err.status === status);
 const originalFetch = globalThis.fetch;
+const originalLog = console.log;
+const auditLogs = [];
+console.log = value => { if (value?.event === 'reaction.request') auditLogs.push(value); else originalLog(value); };
 let verificationCalls = 0;
 let siteverify = {};
 globalThis.fetch = async () => { verificationCalls++; return Response.json(siteverify); };
@@ -53,16 +56,25 @@ try {
 	const claim = await api.readReactionTicket(secret, ticket);
 	siteverify = { success: true, hostname: 'plusmark.example', action: 'reaction', cdata: claim.id };
 	assert.equal((await post(ticket)).status, 200);
+	assert.equal(auditLogs.at(-1).phase, 'accepted');
+	assert.equal(auditLogs.at(-1).verification, 'turnstile');
+	assert.equal(auditLogs.at(-1).submissionId, claim.id);
+	assert.equal(auditLogs.at(-1).count, 1);
+	assert.match(auditLogs.at(-1).voter, /^[a-f0-9]{64}$/);
 	assert.equal(await count(), 1);
 	assert.equal(options.get('pm_verified').maxAge, 3600);
 	assert.equal(options.get('pm_verified').httpOnly, true);
 	assert.equal(options.get('pm_verified').secure, true);
+	await rejects(() => api.POST(event('POST', new URLSearchParams({ ticket }), { origin: 'https://plusmark.example' })), 303);
+	assert.equal(auditLogs.at(-1).status, 303, 'audit wrapper preserves redirect semantics');
 	const pass = cookies.get('pm_verified');
 	const callsBefore = verificationCalls;
 	await Promise.all(Array.from({ length: 5 }, () => post(ticket)));
 	assert.equal(await count(), 1);
 	const next = await ticketFrom(await api.GET(event()));
 	await post(next, { token: '' });
+	assert.equal(auditLogs.at(-1).verification, 'pass');
+	assert.equal(auditLogs.at(-1).active, false);
 	assert.equal(await count(), 0);
 	assert.equal(verificationCalls, callsBefore);
 	assert.equal(cookies.get('pm_verified'), pass, 'using a pass must not extend its lifetime');
@@ -78,5 +90,23 @@ try {
 	await rejects(() => api.POST(event('POST', 'x'.repeat(25000), { origin: 'https://plusmark.example', 'content-type': 'application/x-www-form-urlencoded' })), 413);
 	config.TURNSTILE_SECRET = '';
 	await rejects(() => api.GET(event()), 503);
+	assert.equal(auditLogs.at(-1).status, 503);
+	assert.equal(auditLogs.at(-1).phase, 'configuration');
+	assert.ok(auditLogs.some(log => log.status === 403 && log.phase === 'verification'));
+	assert.ok(auditLogs.some(log => log.status === 403 && log.phase === 'origin'));
+	assert.equal(api.auditSource('https://user:password@example.com/article?token=secret#fragment'), 'https://example.com/article');
+	assert.equal(api.auditSource('malformed'), null);
+	assert.equal(api.auditSource('javascript:alert(1)'), null);
+	await api.auditReactionRequest({ ...event('GET', undefined, {
+		'user-agent': 'a'.repeat(2000), cookie: 'private-cookie', authorization: 'private-auth',
+		'cf-connecting-ip': '192.0.2.1', referer: 'https://user:password@example.com/path?secret=private-query#private-fragment'
+	}), platform: { cf: { asn: 64500, asOrganization: 'Example network', country: 'US', botManagement: { score: 4, verifiedBot: false } } } }, async () => new Response(null, { status: 204 }));
+	assert.equal(auditLogs.at(-1).network, 'Example network');
+	assert.equal(auditLogs.at(-1).botScore, 4);
+	assert.equal(auditLogs.at(-1).referrer, 'https://example.com/path');
+	assert.equal(auditLogs.at(-1).userAgent.length, 512);
+	const serialized = JSON.stringify(auditLogs);
+	for (const sensitive of [secret, ticket, pass, cookies.get('pm_vid'), 'private-cookie', 'private-auth', '192.0.2.1', 'private-query', 'private-fragment', 'password']) assert.ok(!serialized.includes(sensitive), 'logs must exclude credentials and raw visitor IDs');
 	console.log('PASS: GET safety, referrer checks, CSRF, ticket binding/expiry, fail-closed verification, first vote, retries, one-hour pass, undo, body limit, missing configuration');
-} finally { globalThis.fetch = originalFetch; }
+	console.log('PASS: audit acceptance/rejection, verification paths, correlation IDs, sanitized source URLs, no credentials');
+} finally { globalThis.fetch = originalFetch; console.log = originalLog; }

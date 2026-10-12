@@ -1,6 +1,11 @@
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "plusmark",
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1,
+		"logs": { "enabled": true, "invocation_logs": false, "persist": true }
+	},
 	"vars": {
 		"TURNSTILE_SITE_KEY": "0x4AAAAAAFTa2ln7y9mcnv5S",
 		"TURNSTILE_HOSTNAME": "plusmark.ilverism.workers.dev"

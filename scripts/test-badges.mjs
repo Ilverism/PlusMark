@@ -5,7 +5,7 @@ import ts from 'typescript';
 import { formatReactionCount } from '../src/lib/reaction-count.ts';
 import { buildMarkdownSnippet } from '../src/lib/widget.ts';
 import * as themes from '../src/lib/badge-theme.ts';
-import * as marker from '../src/lib/server/destination-marker.ts';
+import * as marker from '../src/lib/destination-marker.ts';
 import { compile } from 'mdsvex';
 
 test('table formats preserve columns, optional badges, and literal descriptions', async () => {
@@ -39,7 +39,7 @@ const compiledRoute = ts.transpileModule(routeSource, {
 async function renderBadge(count, emoji = '👍', label = 'Like', options = {}) {
 	const exports = {};
 	new Function('require', 'exports', compiledRoute)(name => {
-		if (name === '$lib/server/destination-marker') return marker;
+		if (name === '$lib/destination-marker') return marker;
 		if (name === '$lib/badge-theme') return themes;
 		if (name === '$lib/reaction-count') return { formatReactionCount };
 		if (name === '$lib/server/reaction-service') return {

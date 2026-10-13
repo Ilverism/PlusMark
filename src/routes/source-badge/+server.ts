@@ -4,7 +4,7 @@ import githubMark from '$lib/assets/github-mark.svg?raw';
 import { error, type RequestHandler } from '@sveltejs/kit';
 import { normalizeDocId } from '$lib/widget';
 import { getReactionDocumentStub } from '$lib/server/reaction-service';
-import { destinationColors, destinationDot, escapeXml } from '$lib/server/destination-marker';
+import { destinationColors, destinationDot, escapeXml } from '$lib/destination-marker';
 import { sourceFavicon } from '$lib/server/source-favicon';
 
 export const GET: RequestHandler = async (event) => {

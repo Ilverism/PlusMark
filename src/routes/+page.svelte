@@ -84,7 +84,7 @@
 			<span class="text-foreground text-base font-black group-hover:underline">PlusMark</span>
 
 			<!-- Not Hovering -> Show Version & Date -->
-			<span class="text-xs text-foreground font-light group-hover:hidden">ver. 2026-10.11 (Beta)</span>
+			<span class="text-xs text-foreground font-light group-hover:hidden">ver. 2026-10.13 (Beta)</span>
 			<span class="text-xs text-foreground font-light not-group-hover:hidden flex gap-1 items-center">
 				<ExternalLink  size={16}/>
 				Open in GitHub</span>

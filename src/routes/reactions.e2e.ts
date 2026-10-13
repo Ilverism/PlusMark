@@ -1,5 +1,53 @@
 import { expect, test } from '@playwright/test';
 
+test('generated Return URL identifier matches the badge and explains itself on focus', async ({ page, context, request }, testInfo) => {
+	await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	const marker = page.getByRole('button', { name: 'Return URL identifier', exact: true });
+	await expect(marker).toHaveCount(0);
+	await page.getByRole('checkbox', { name: 'Include source badge' }).uncheck();
+	await page.locator('#content-id').fill(`identifier-${crypto.randomUUID()}`);
+	let previousColors: string[] = [];
+	for (const returnUrl of ['https://example.test/first', 'https://example.test/second']) {
+		await page.locator('#return-url').fill(returnUrl);
+		await expect(marker).toHaveCount(0);
+		await page.getByRole('button', { name: 'Generate', exact: true }).click();
+		await expect(marker).toBeVisible();
+		const colors = await marker.locator('stop').evaluateAll(stops => stops.map(stop => stop.getAttribute('stop-color')!));
+		expect(colors).not.toEqual(previousColors);
+		previousColors = colors;
+		const output = (await page.locator('.main-card-generated-code').textContent())!.trim();
+		const badgeUrl = output.match(/https?:\/\/[^\s)]+\/badge\?[^)]+/)![0];
+		const badge = await request.get(badgeUrl);
+		expect(badge.ok()).toBe(true);
+		const svg = await badge.text();
+		expect([...svg.matchAll(/stop-color="([^"]+)"/g)].map(match => match[1])).toEqual(colors);
+		const copy = page.getByRole('button', { name: 'Copy', exact: true });
+		await marker.scrollIntoViewIfNeeded();
+		const markerBox = (await marker.boundingBox())!;
+		const copyBox = (await copy.boundingBox())!;
+		expect(markerBox.x + markerBox.width).toBeLessThan(copyBox.x);
+		expect(Math.abs(markerBox.y + markerBox.height / 2 - copyBox.y - copyBox.height / 2)).toBeLessThan(2);
+		await copy.focus();
+		await page.keyboard.press('Shift+Tab');
+		await expect(marker).toBeFocused();
+		await expect(page.getByRole('tooltip')).toHaveText('This gradient will appear inside your displayed badges. It helps viewers confirm that the reactions correspond to the correct Return URL when the "Include source badge" option is enabled.');
+		await page.keyboard.press('Escape');
+		await copy.focus();
+		await marker.hover();
+		await expect(page.getByRole('tooltip')).toBeVisible();
+		if (returnUrl.endsWith('/first')) await page.screenshot({ path: testInfo.outputPath('identifier-preview.png') });
+		await copy.click();
+		expect((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n')).toBe(output);
+	}
+	await page.locator('#return-url').fill('https://example.test/failure');
+	await page.route('**/api/widgets', route => route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"Test failure"}' }));
+	await page.getByRole('button', { name: 'Generate', exact: true }).click();
+	await expect(page.locator('.main-card-generated-code')).toHaveText('Test failure');
+	await expect(marker).toHaveCount(0);
+});
+
 test('Sonner warns on existing group updates, deduplicates retries, and follows the page theme', async ({ page }) => {
 	await page.goto('/');
 	await page.waitForLoadState('networkidle');

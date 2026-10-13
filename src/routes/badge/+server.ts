@@ -2,7 +2,7 @@ import { badgePalette, type BadgeTheme } from '$lib/badge-theme';
 import type { RequestHandler } from '@sveltejs/kit';
 import { getReactionDocumentStub, parseDocAndReaction } from '$lib/server/reaction-service';
 import { formatReactionCount } from '$lib/reaction-count';
-import { destinationColors, destinationDot, escapeXml } from '$lib/server/destination-marker';
+import { destinationColors, destinationDot, escapeXml } from '$lib/destination-marker';
 
 const BADGE_HEADERS = {
 	'content-type': 'image/svg+xml; charset=utf-8',

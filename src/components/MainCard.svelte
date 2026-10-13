@@ -5,8 +5,9 @@
 	import { Checkbox } from "$lib/components/ui/checkbox";
 	import * as Field from "$lib/components/ui/field";
 	import { Input } from "$lib/components/ui/input";
-	import * as Tooltip from "$lib/components/ui/tooltip/index.js";
 	import * as NativeSelect from "$lib/components/ui/native-select/index.js";
+	import * as Tooltip from "$lib/components/ui/tooltip/index.js";
+	import { destinationColors } from "$lib/destination-marker";
 	import Manager from "$lib/Manager.svelte";
 	import { __generate_HTML_button } from "$lib/paraglide/messages";
 	import { normalizeReturnUrl, slugifyContentId } from "$lib/widget";
@@ -272,6 +273,28 @@
 				{Manager.outputDisplayed}
 				</code>
 				<div class="flex shrink-0 items-center justify-end gap-2 pt-1">
+					{#if Manager.output && Manager.generatedReturnUrl}
+						{#await destinationColors(Manager.generatedReturnUrl) then colors}
+							<Tooltip.Root>
+								<Tooltip.Trigger aria-label="Return URL identifier" class="mr-auto flex size-8 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-ring">
+									<svg aria-hidden="true" width="24" height="24" viewBox="0 0 12 12">
+										<defs>
+											<linearGradient id="destination-preview-gradient" x1="0" y1="0" x2="1" y2="1">
+												<stop stop-color={colors[0]} />
+												<stop offset="1" stop-color={colors[1]} />
+											</linearGradient>
+										</defs>
+										<circle cx="6" cy="6" r="5" fill="url(#destination-preview-gradient)" stroke="#374151" stroke-opacity="0.4" stroke-width="0.75" />
+									</svg>
+								</Tooltip.Trigger>
+								<Tooltip.Content role="tooltip">
+									<p>This gradient will appear inside your displayed badges. It helps viewers confirm that the reactions correspond to the correct Return URL when the "Include source badge" option is enabled.</p>
+								</Tooltip.Content>
+							</Tooltip.Root>
+						{:catch}
+							<span class="mr-auto text-xs text-muted-foreground">Identifier preview unavailable.</span>
+						{/await}
+					{/if}
 					<span class="text-xs text-muted-foreground" role="status">
 						{copyStatus?.output === Manager.output ? copyStatus.message : ''}
 					</span>

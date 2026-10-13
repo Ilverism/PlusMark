@@ -27,7 +27,7 @@
 					<li>{__instructions_step_3()}</li> -->
 					<!-- <li>Add all of the <b>Reactions</b> you want and choose their icons.</li> -->
 					<li>Use the <b>Add Reaction</b> button to add all of the new reactions you want, then choose their names and icons.</li>
-					<li>Enter the <b>Return URL</b> where the user will be redirected to when clicked <i>(should be the same page where the reactions will be displayed)</i>.</li>
+					<li>Paste/enter the <b>Return URL</b> where the user will be redirected to when clicked <i>(should be the same page where the reactions will be displayed)</i>.</li>
 					<li>Enter the <b>Content ID</b> & <b>Reaction Group ID</b>, which are used to identify the group of generated reactions.</li>
 					<li>Click the <b>Generate</b> button.</li>
 					<li>Click the <b>Copy</b> button, then paste the generated Markdown content into your document.</li>
@@ -47,6 +47,7 @@
 					<li>Anyone can duplicate and use any generated reactions in any document. This can be partially mitigated by keeping <b>Reject votes from other URLs</b> enabled.</li>
 					<li>Reactions are vulnerable to being spammed. The same user using multiple browsers or devices can interact with the same reaction multiple times.</li>
 					<li>Existing protections are intended to guard against automated crawlers and bot activity, and may not be effective against targeted spam efforts.</li>
+					<li>If you close or refresh the tab after generating your reactions, they can no longer be edited. A new set of reactions will need to be generated with a new Reaction Group ID.</li>
 				</ul>
 			</Accordion.Content>
 		</Accordion.Item>

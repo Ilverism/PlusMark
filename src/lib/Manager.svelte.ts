@@ -60,6 +60,7 @@ class Manager {
 	});
 
 	output: string = $state("");
+	generatedReturnUrl = $state("");
 	outputDisplayed: string = $derived.by(() => {
 
 		if (this.output.length > 0)
@@ -277,6 +278,7 @@ class Manager {
 	markDirty() {
 		this.didStartGenerate = false;
 		this.output = "";
+		this.generatedReturnUrl = "";
 		this.error = "";
 	}
 
@@ -300,6 +302,7 @@ class Manager {
 		// Flag as generating
 		this.isGenerating = true;
 		this.output = "";
+		this.generatedReturnUrl = "";
 		this.error = "";
 
 		const widgetInput = createWidgetInput({
@@ -367,6 +370,7 @@ class Manager {
 			}
 
 			this.output = buildMarkdownSnippet(body.widget, window.location.origin, this.includePlusMarkBadge, this.includeSourceBadge, this.formatting, this.includeIdTag);
+			this.generatedReturnUrl = body.widget.returnUrl;
 			if (body.created === false) {
 				toast.warning('Existing reaction group updated', {
 					id: GENERATION_TOAST_ID,

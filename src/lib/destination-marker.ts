@@ -2,7 +2,7 @@ export function escapeXml(value: string): string {
 	return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/** A repeatable visual cue, not a unique identifier or proof of origin. */
+/** Shared by badge rendering and the generator preview. A visual cue, not proof of origin. */
 export async function destinationColors(returnUrl: string): Promise<[string, string]> {
 	const canonical = new URL(returnUrl).href;
 	const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical)));

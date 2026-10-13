@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
 import * as themes from '../src/lib/badge-theme.ts';
-import * as marker from '../src/lib/server/destination-marker.ts';
+import * as marker from '../src/lib/destination-marker.ts';
 
 const githubMark = await readFile(new URL('../src/lib/assets/github-mark.svg', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(await readFile(new URL('../src/routes/source-badge/+server.ts', import.meta.url), 'utf8'), {
@@ -16,7 +16,7 @@ async function render(returnUrl, badgeTheme, favicon) {
 	new Function('require', 'exports', compiled)(name => {
 		if (name === '$lib/assets/github-mark.svg?raw') return githubMark;
 		if (name === '$lib/badge-theme') return themes;
-		if (name === '$lib/server/destination-marker') return marker;
+		if (name === '$lib/destination-marker') return marker;
 		if (name === '$lib/widget') return { normalizeDocId: value => value };
 		if (name === '@sveltejs/kit') return { error: () => assert.fail('unexpected route error') };
 		if (name === '$lib/server/source-favicon') return { sourceFavicon: async () => { faviconCalls++; return favicon; } };

@@ -84,7 +84,7 @@ server validates its token, exact hostname, action, and submission ID before
 accepting a POST. Successful verification sets a signed, HttpOnly cookie for one
 hour. By default, every reaction requires pressing **Submit Reaction** on the verification
 page, including when that cookie skips another challenge. Users can opt into
-**Temporarily submit future reactions automatically**. The checkbox preference is
+**Submit future reactions automatically (temporary)**. The checkbox preference is
 remembered in local storage, but only a successful explicit submission grants a
 separate signed, visitor-bound permission that expires with the verification pass.
 Future reactions then submit immediately when the page opens in a visible tab.

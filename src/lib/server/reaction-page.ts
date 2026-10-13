@@ -5,13 +5,13 @@ export function reactionPage(options: { doc: string; action: string; ticket: str
 	<main>
 		<span id="vote-delta" role="img" aria-label="${options.hasVoted ? 'Remove your vote' : 'Add your vote'}">${options.hasVoted ? '−1' : '+1'}</span>
 		<h1>${escapeHtml(options.label)}</h1>
-		<p id="status" role="status" aria-live="polite">${options.verified ? '• Ready. Press Submit Reaction to record your vote.' : '• Complete the security check, then press Submit Reaction.'}</p>
-		<span>• Submitting adds or removes your reaction vote, then returns you to the source page.</span>
+		<p id="status" role="status" aria-live="polite">${options.verified ? '• Ready. Press <b>Submit Reaction</b> to record your vote.' : '• Complete the security check, then press <b>Submit Reaction</b>.'}</p>
+		<span>• Submitting adds (or removes) your reaction vote, then returns you to the source page.</span>
 		<form method="post" action="${escapeHtml(options.action)}" data-verified="${options.verified}" data-automatic="${options.automatic === true}" data-site-key="${escapeHtml(options.siteKey)}" data-ticket-id="${options.ticketId}">
 			<input type="hidden" name="ticket" value="${escapeHtml(options.ticket)}">
 			<div id="challenge"></div>
 			<div id="automatic-row"${options.verified ? '' : ' hidden'}>
-				<label class="automatic-option"><input id="automatic" name="automatic" type="checkbox" aria-describedby="automatic-help"> <span>Temporarily submit future reactions automatically</span></label>
+				<label class="automatic-option"><input id="automatic" name="automatic" type="checkbox" aria-describedby="automatic-help"> <span>Submit future reactions automatically (temporary)</span></label>
 				<span class="automatic-help-trigger">
 					<button type="button" id="automatic-help-button" aria-label="About automatic submission" aria-describedby="automatic-help">
 						<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>

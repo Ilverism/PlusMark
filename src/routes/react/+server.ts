@@ -12,7 +12,7 @@ const AUTOMATIC_COOKIE = 'pm_automatic';
 const REACTION_HEADERS = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' };
 const PAGE_HEADERS = {
 	'content-type': 'text/html; charset=utf-8',
-	'content-security-policy': "default-src 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+	'content-security-policy': "default-src 'none'; img-src 'self'; manifest-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
 	'x-content-type-options': 'nosniff',
 	'referrer-policy': 'no-referrer'
 };

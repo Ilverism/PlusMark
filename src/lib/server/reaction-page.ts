@@ -1,7 +1,13 @@
 export const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
 
 export function reactionPage(options: { doc: string; action: string; ticket: string; ticketId: string; siteKey: string; verified: boolean; automatic?: boolean; hasVoted?: boolean; returnUrl: string; label: string; preview?: boolean }) {
-	return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>React — PlusMark</title><link rel="stylesheet" href="/reaction-verification.css">${options.preview ? '' : '<script src="/reaction-verification.js" defer></script>'}</head><body><div class="background-pattern" aria-hidden="true"></div>
+	return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>React — PlusMark</title>
+	<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
+	<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+	<link rel="shortcut icon" href="/favicon.ico">
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+	<link rel="manifest" href="/site.webmanifest">
+	<link rel="stylesheet" href="/reaction-verification.css">${options.preview ? '' : '<script src="/reaction-verification.js" defer></script>'}</head><body><div class="background-pattern" aria-hidden="true"></div>
 	<main>
 		<span id="vote-delta" role="img" aria-label="${options.hasVoted ? 'Remove your vote' : 'Add your vote'}">${options.hasVoted ? '−1' : '+1'}</span>
 		<h1>${escapeHtml(options.label)}</h1>
@@ -35,6 +41,6 @@ export function reactionPage(options: { doc: string; action: string; ticket: str
 	</noscript>
 	<p id="return-link">
 		<a href="${escapeHtml(options.returnUrl)}" rel="noreferrer">↩ Return immediately: '${escapeHtml(options.returnUrl)}'</a>
-		<small>No vote is changed until you submit.</small>
+		<small>Your vote will not be recorded if you leave without submitting.</small>
 	</p></body></html>`;
 }

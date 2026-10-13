@@ -14,7 +14,7 @@ export const GET: RequestHandler = ({ url }) => {
 			'content-type': 'text/html; charset=utf-8',
 			'cache-control': 'no-store',
 			'x-robots-tag': 'noindex, nofollow',
-			'content-security-policy': "default-src 'none'; style-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'"
+			'content-security-policy': "default-src 'none'; img-src 'self'; manifest-src 'self'; style-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'"
 		}
 	});
 };

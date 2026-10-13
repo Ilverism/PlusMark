@@ -2,7 +2,6 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import type { Pathname } from '$app/types';
-	import favicon from '$lib/assets/favicon.svg';
 	import * as Tooltip from "$lib/components/ui/tooltip/index.js";
 	import { Toaster } from '$lib/components/ui/sonner';
 	import Manager from "$lib/Manager.svelte";
@@ -27,7 +26,6 @@
 
 <svelte:head>
 	<title>PlusMark</title>
-	<link rel="icon" href={favicon} />
 	<link rel="preload" href={notoSansLatin} as="font" type="font/woff2" crossorigin="anonymous" />
 </svelte:head>
 

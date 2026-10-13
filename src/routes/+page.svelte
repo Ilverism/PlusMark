@@ -91,11 +91,13 @@
 		</div>
 
 	</TextButton>
-	<TextButton link="https://github.com" cLass="absolute bottom-4 left-4 hover:underline">
+
+	<!-- Support Button -->
+	<!-- <TextButton link="https://github.com" cLass="absolute bottom-4 left-4 hover:underline">
 		<Coffee size={18} />
 		<span>{__support()} (Ko-fi)</span>
 	</TextButton>
-	<LanguagePicker cLass="absolute bottom-4 right-4" />
+	<LanguagePicker cLass="absolute bottom-4 right-4" /> -->
 
 	<!-- Emoji Picker -->
 	{#if Manager.reactionEmojiPickerOpen}

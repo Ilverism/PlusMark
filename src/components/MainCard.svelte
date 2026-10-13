@@ -199,18 +199,18 @@
 				</div>
 			</Field.Field>
 
-			<!-- Include source badge -->
-			<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
-				<Checkbox id="include-source-badge" checked={Manager.includeSourceBadge}
-					onCheckedChange={(checked) => Manager.setIncludeSourceBadge(checked)} />
-				<Field.Label for="include-source-badge" class="text-base font-semibold">Include source badge</Field.Label>
-			</Field.Field>
-
 			<!-- Include ID tag -->
 			<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
 				<Checkbox id="include-id-tag" checked={Manager.includeIdTag}
 					onCheckedChange={(checked) => Manager.setIncludeIdTag(checked)} />
 				<Field.Label for="include-id-tag" class="text-base font-semibold">Include ID tag</Field.Label>
+			</Field.Field>
+
+			<!-- Include source badge -->
+			<Field.Field orientation="horizontal" class="w-fit gap-2 pt-2">
+				<Checkbox id="include-source-badge" checked={Manager.includeSourceBadge}
+					onCheckedChange={(checked) => Manager.setIncludeSourceBadge(checked)} />
+				<Field.Label for="include-source-badge" class="text-base font-semibold">Include source badge</Field.Label>
 			</Field.Field>
 
 			<!-- Include PlusMark badge -->

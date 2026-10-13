@@ -10,6 +10,19 @@ new Function('exports', ts.transpileModule(readFileSync(new URL('../src/lib/serv
 const secret = 'test-signing-secret';
 const now = 1_800_000_000_000;
 
+test('automatic grants are visitor-bound and expire with the original verification pass', async () => {
+	const pass = await verification.createVerificationPass(secret, 'visitor', now);
+	const grant = await verification.createAutomaticPass(secret, pass, 'visitor', now + 1_800_000);
+	assert.equal(await verification.hasAutomaticPass(secret, grant, 'visitor', now + 3_599_999), true);
+	assert.equal(await verification.hasAutomaticPass(secret, grant, 'visitor', now + 3_600_000), false);
+	assert.equal(await verification.hasAutomaticPass(secret, grant, 'other', now), false);
+	assert.equal(await verification.hasAutomaticPass(secret, grant + 'x', 'visitor', now), false);
+	assert.equal(await verification.hasAutomaticPass(secret, pass, 'visitor', now), false);
+	assert.equal(await verification.hasVerificationPass(secret, grant, 'visitor', now), false);
+	assert.equal(await verification.createAutomaticPass(secret, pass, 'other', now), null);
+	assert.equal(await verification.createAutomaticPass(secret, pass, 'visitor', now + 3_600_000), null);
+});
+
 test('verification passes are signed, visitor-bound, and expire after one hour', async () => {
 	const pass = await verification.createVerificationPass(secret, 'visitor', now);
 	assert.equal(await verification.hasVerificationPass(secret, pass, 'visitor', now + 3_599_999), true);

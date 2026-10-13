@@ -99,6 +99,8 @@ type ToggleSuccess = {
 	count: number;
 	active: boolean;
 	returnUrl: string;
+	automatic?: boolean;
+	cancelled?: boolean;
 };
 
 const GITHUB_STATE_KEY = 'default';
@@ -198,6 +200,12 @@ export class ReactionDocument extends DurableObject<Env> {
 		};
 	}
 
+	async hasVote(reactionId: string, voterHash: string): Promise<boolean> {
+		return this.ctx.storage.sql.exec(
+			'SELECT 1 FROM votes WHERE reaction = ? AND voter_hash = ? LIMIT 1', reactionId, voterHash
+		).toArray().length > 0;
+	}
+
 	async getWidget(): Promise<WidgetSuccess | RpcFailure> {
 		const widget = this.readWidget();
 
@@ -250,7 +258,7 @@ export class ReactionDocument extends DurableObject<Env> {
 		};
 	}
 
-	async toggleReaction(reactionId: string, voterHash: string, referrer: string | null = null, submission?: { id: string; expiresAt: number }): Promise<ToggleSuccess | RpcFailure> {
+	async toggleReaction(reactionId: string, voterHash: string, referrer: string | null = null, submission?: { id: string; expiresAt: number; automatic?: boolean }): Promise<ToggleSuccess | RpcFailure> {
 		let badgeChanged = false;
 		let changedDoc: string | null = null;
 		const result = this.ctx.storage.transactionSync(() => {
@@ -261,9 +269,11 @@ export class ReactionDocument extends DurableObject<Env> {
 				const previous = this.ctx.storage.sql.exec<{ voter: string; reaction: string; result: string }>(
 					'SELECT voter, reaction, result FROM reaction_submissions WHERE id = ?', submission.id
 				).toArray()[0];
-				if (previous) return previous.voter === voterHash && previous.reaction === reactionId
-					? JSON.parse(previous.result) as ToggleSuccess
-					: { ok: false, status: 409, message: 'Submission already used.' } satisfies RpcFailure;
+				if (previous) {
+					if (previous.voter !== voterHash || previous.reaction !== reactionId) return { ok: false, status: 409, message: 'Submission already used.' } satisfies RpcFailure;
+					const receipt = JSON.parse(previous.result) as ToggleSuccess;
+					return receipt.cancelled ? { ok: false, status: 409, message: 'Submission cancelled.' } satisfies RpcFailure : receipt;
+				}
 			}
 			const widget = this.getWidgetRow();
 			if (!widget) {
@@ -337,12 +347,16 @@ export class ReactionDocument extends DurableObject<Env> {
 				ok: true,
 				count,
 				active,
+				automatic: submission?.automatic === true,
 				returnUrl: widget.return_url
 			} satisfies ToggleSuccess;
 			if (submission) this.ctx.storage.sql.exec(
 				'INSERT INTO reaction_submissions (id, voter, reaction, result, expires_at) VALUES (?, ?, ?, ?, ?)',
 				submission.id, voterHash, reactionId, JSON.stringify(receipt), submission.expiresAt
 			);
+			this.ctx.storage.sql.exec('DELETE FROM reaction_vote_actions WHERE expires_at <= ?', Date.now());
+			this.ctx.storage.sql.exec('INSERT OR REPLACE INTO reaction_vote_actions (reaction, voter, id, expires_at) VALUES (?, ?, ?, ?)',
+				reactionId, voterHash, submission?.id ?? crypto.randomUUID(), submission?.expiresAt ?? Date.now() + 600_000);
 			this.statistics.recordVote();
 			changedDoc = widget.doc;
 			return receipt;
@@ -360,6 +374,48 @@ export class ReactionDocument extends DurableObject<Env> {
 		}
 		if (result.ok) await this.ensureAlarmScheduled();
 
+		return result;
+	}
+
+	async cancelReaction(reactionId: string, voterHash: string, submission: { id: string; expiresAt: number }): Promise<ToggleSuccess | RpcFailure> {
+		let badgeChanged = false;
+		let reversed = false;
+		let changedDoc: string | null = null;
+		const result = this.ctx.storage.transactionSync(() => {
+			if (submission.expiresAt <= Date.now()) return { ok: false, status: 410, message: 'Cancellation expired. Please click the badge again.' } satisfies RpcFailure;
+			const sql = this.ctx.storage.sql;
+			sql.exec('DELETE FROM reaction_submissions WHERE expires_at <= ?', Date.now());
+			const previous = sql.exec<{ voter: string; reaction: string; result: string }>('SELECT voter, reaction, result FROM reaction_submissions WHERE id = ?', submission.id).toArray()[0];
+			if (previous && (previous.voter !== voterHash || previous.reaction !== reactionId)) return { ok: false, status: 409, message: 'Submission already used.' } satisfies RpcFailure;
+			const receipt = previous ? JSON.parse(previous.result) as ToggleSuccess : null;
+			if (receipt?.cancelled) return receipt;
+			if (receipt && !receipt.automatic) return { ok: false, status: 409, message: 'Only automatic submissions can be cancelled.' } satisfies RpcFailure;
+			const widget = this.getWidgetRow();
+			const reaction = this.readReaction(reactionId);
+			if (!widget || !reaction) return { ok: false, status: 404, message: 'Unknown reaction.' } satisfies RpcFailure;
+			let active = sql.exec('SELECT 1 FROM votes WHERE reaction = ? AND voter_hash = ?', reactionId, voterHash).toArray().length > 0;
+			const latest = sql.exec<{ id: string }>('SELECT id FROM reaction_vote_actions WHERE reaction = ? AND voter = ?', reactionId, voterHash).toArray()[0];
+			// Reverse only this page's action; a later vote in another tab takes precedence.
+			if (receipt && latest?.id === submission.id && active === receipt.active) {
+				active = !active;
+				if (active) sql.exec('INSERT INTO votes (reaction, voter_hash, created_at) VALUES (?, ?, ?)', reactionId, voterHash, Date.now());
+				else sql.exec('DELETE FROM votes WHERE reaction = ? AND voter_hash = ?', reactionId, voterHash);
+				sql.exec('UPDATE counts SET count = MAX(0, count + ?) WHERE reaction = ?', active ? 1 : -1, reactionId);
+				sql.exec('UPDATE reaction_vote_actions SET id = ? WHERE reaction = ? AND voter = ?', `cancel:${submission.id}`, reactionId, voterHash);
+				reversed = true;
+			}
+			const count = sql.exec<{ count: number }>('SELECT count FROM counts WHERE reaction = ?', reactionId).toArray()[0]?.count ?? 0;
+			if (reversed) badgeChanged = this.updateBadgePublication(reactionId, count, reaction.count ?? 0, true).changed;
+			const cancelled = { ok: true, count, active, returnUrl: widget.return_url, cancelled: true } satisfies ToggleSuccess;
+			// A receipt also blocks a delayed vote when cancellation reaches the server first.
+			sql.exec('INSERT OR REPLACE INTO reaction_submissions (id, voter, reaction, result, expires_at) VALUES (?, ?, ?, ?, ?)',
+				submission.id, voterHash, reactionId, JSON.stringify(cancelled), submission.expiresAt);
+			changedDoc = widget.doc;
+			return cancelled;
+		});
+		if (result.ok && changedDoc !== null) console.log({ event: 'reaction.cancel', at: new Date().toISOString(), doc: changedDoc, reaction: reactionId, voter: voterHash, submissionId: submission.id, reversed, active: result.active, count: result.count });
+		if (result.ok && badgeChanged) await this.queueCamoPurge(result.returnUrl, reactionId);
+		if (result.ok && reversed) await this.ensureAlarmScheduled();
 		return result;
 	}
 
@@ -414,6 +470,8 @@ export class ReactionDocument extends DurableObject<Env> {
 		const sql = this.ctx.storage.sql;
 		sql.exec('CREATE TABLE IF NOT EXISTS reaction_submissions (id TEXT PRIMARY KEY, voter TEXT NOT NULL, reaction TEXT NOT NULL, result TEXT NOT NULL, expires_at INTEGER NOT NULL)');
 		sql.exec('CREATE INDEX IF NOT EXISTS reaction_submissions_expiry ON reaction_submissions (expires_at)');
+		sql.exec('CREATE TABLE IF NOT EXISTS reaction_vote_actions (reaction TEXT NOT NULL, voter TEXT NOT NULL, id TEXT NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY (reaction, voter))');
+		sql.exec('CREATE INDEX IF NOT EXISTS reaction_vote_actions_expiry ON reaction_vote_actions (expires_at)');
 		sql.exec(`CREATE TABLE IF NOT EXISTS badge_publications (
 			reaction TEXT PRIMARY KEY, window_started_at INTEGER NOT NULL, window_count INTEGER NOT NULL,
 			throttled_until INTEGER NOT NULL, published_count INTEGER NOT NULL, next_publish_at INTEGER NOT NULL

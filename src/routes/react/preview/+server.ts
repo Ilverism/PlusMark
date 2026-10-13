@@ -7,6 +7,7 @@ export const GET: RequestHandler = ({ url }) => {
 	return new Response(reactionPage({
 		doc: 'example-content-g-0123456789abcdef', action: '/react/preview', ticket: '', ticketId: '', siteKey: '',
 		verified: url.searchParams.get('verified') === '1',
+		hasVoted: url.searchParams.get('voted') === '1',
 		returnUrl: '/', label: '👍 Thumbs Up', preview: true
 	}), {
 		headers: {

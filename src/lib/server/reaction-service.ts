@@ -18,7 +18,7 @@ import {
 
 export type ReactionDocumentStub = Pick<
 	ReactionDocument,
-	'saveWidget' | 'getWidget' | 'getBadge' | 'toggleReaction'
+	'saveWidget' | 'getWidget' | 'getBadge' | 'toggleReaction' | 'hasVote' | 'cancelReaction'
 >;
 
 type WidgetPayload = {
@@ -222,7 +222,8 @@ type DevRecord = {
 
 class DevReactionDocument implements ReactionDocumentStub {
 	private generatedReactions = new Set<string>();
-	private submissions = new Map<string, { expiresAt: number; voter: string; reaction: string; result: { ok: true; count: number; active: boolean; returnUrl: string } }>();
+	private submissions = new Map<string, { expiresAt: number; voter: string; reaction: string; result: { ok: true; count: number; active: boolean; returnUrl: string; automatic?: boolean; cancelled?: boolean } }>();
+	private latestVoteActions = new Map<string, string>();
 	private record: DevRecord | null = null;
 	private publications = new Map<string, BadgePublication>();
 
@@ -294,6 +295,10 @@ class DevReactionDocument implements ReactionDocumentStub {
 		};
 	}
 
+	async hasVote(reactionId: string, voterHash: string) {
+		return this.record?.votes.get(reactionId)?.has(voterHash) ?? false;
+	}
+
 	async getBadge(reactionId: string) {
 		if (!this.record) return this.unknownDocument();
 
@@ -321,13 +326,15 @@ class DevReactionDocument implements ReactionDocumentStub {
 		};
 	}
 
-	async toggleReaction(reactionId: string, voterHash: string, referrer: string | null = null, submission?: { id: string; expiresAt: number }) {
+	async toggleReaction(reactionId: string, voterHash: string, referrer: string | null = null, submission?: { id: string; expiresAt: number; automatic?: boolean }) {
 		if (submission) {
 			if (submission.expiresAt <= Date.now()) return { ok: false, status: 410, message: 'This reaction link has expired. Click the badge again.' } satisfies DevFailure;
 			for (const [id, item] of this.submissions) if (item.expiresAt <= Date.now()) this.submissions.delete(id);
 			const previous = this.submissions.get(submission.id);
-			if (previous) return previous.voter === voterHash && previous.reaction === reactionId ? previous.result
-				: { ok: false, status: 409, message: 'Submission already used.' } satisfies DevFailure;
+			if (previous) {
+				if (previous.voter !== voterHash || previous.reaction !== reactionId) return { ok: false, status: 409, message: 'Submission already used.' } satisfies DevFailure;
+				return previous.result.cancelled ? { ok: false, status: 409, message: 'Submission cancelled.' } satisfies DevFailure : previous.result;
+			}
 		}
 		if (!this.record) return this.unknownDocument();
 		if (this.record.widget.verifyReferrer && !isReactionSourceAllowed(this.record.widget.returnUrl, referrer)) {
@@ -367,10 +374,38 @@ class DevReactionDocument implements ReactionDocumentStub {
 			ok: true as const,
 			count: reaction.count,
 			active,
+			automatic: submission?.automatic === true,
 			returnUrl: this.record.widget.returnUrl
 		};
 		if (submission) this.submissions.set(submission.id, { ...submission, voter: voterHash, reaction: reactionId, result });
+		this.latestVoteActions.set(`${reactionId}\0${voterHash}`, submission?.id ?? crypto.randomUUID());
 		devStatistics.votes++;
+		return result;
+	}
+
+	async cancelReaction(reactionId: string, voterHash: string, submission: { id: string; expiresAt: number }) {
+		if (submission.expiresAt <= Date.now()) return { ok: false, status: 410, message: 'Cancellation expired. Please click the badge again.' } satisfies DevFailure;
+		const previous = this.submissions.get(submission.id);
+		if (previous && (previous.voter !== voterHash || previous.reaction !== reactionId)) return { ok: false, status: 409, message: 'Submission already used.' } satisfies DevFailure;
+		if (previous?.result.cancelled) return previous.result;
+		if (previous && !previous.result.automatic) return { ok: false, status: 409, message: 'Only automatic submissions can be cancelled.' } satisfies DevFailure;
+		if (!this.record) return this.unknownDocument();
+		const reaction = this.record.widget.reactions.find(item => item.id === reactionId);
+		if (!reaction) return { ok: false, status: 404, message: 'Unknown reaction.' } satisfies DevFailure;
+		const votes = this.record.votes.get(reactionId) ?? new Set<string>();
+		let active = votes.has(voterHash);
+		const key = `${reactionId}\0${voterHash}`;
+		if (previous && this.latestVoteActions.get(key) === submission.id && active === previous.result.active) {
+			active = !active;
+			if (active) votes.add(voterHash); else votes.delete(voterHash);
+			this.record.votes.set(reactionId, votes);
+			reaction.count = Math.max(0, reaction.count + (active ? 1 : -1));
+			this.record.widget.updatedAt = Date.now();
+			this.latestVoteActions.set(key, `cancel:${submission.id}`);
+			this.publications.set(reactionId, advanceBadgePublication(this.publications.get(reactionId) ?? null, reaction.count, Date.now(), true));
+		}
+		const result = { ok: true as const, count: reaction.count, active, returnUrl: this.record.widget.returnUrl, cancelled: true };
+		this.submissions.set(submission.id, { ...submission, voter: voterHash, reaction: reactionId, result });
 		return result;
 	}
 

@@ -5,9 +5,10 @@ import { getHmacSecret, getReactionDocumentStub, getVisitorId, getVoterHash, par
 import { isReactionSourceAllowed } from '$lib/server/reaction-source';
 import { escapeHtml, reactionPage } from '$lib/server/reaction-page';
 import { auditReactionRequest } from '$lib/server/reaction-audit';
-import { createReactionTicket, createVerificationPass, hasVerificationPass, readReactionTicket, verifyTurnstile, VERIFICATION_SECONDS } from '$lib/server/reaction-verification';
+import { createAutomaticPass, hasAutomaticPass, createReactionTicket, createVerificationPass, hasVerificationPass, readReactionTicket, verifyTurnstile, VERIFICATION_SECONDS } from '$lib/server/reaction-verification';
 
 const VERIFIED_COOKIE = 'pm_verified';
+const AUTOMATIC_COOKIE = 'pm_automatic';
 const REACTION_HEADERS = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' };
 const PAGE_HEADERS = {
 	'content-type': 'text/html; charset=utf-8',
@@ -61,13 +62,15 @@ export const GET: RequestHandler = (event) => auditReactionRequest(event, async 
 	const config = configuration(event);
 	const secret = getHmacSecret(event);
 	const visitor = getVisitorId(event);
+	const hasVoted = await stub.hasVote(reaction, await getVoterHash(event, doc));
 	const ticket = await createReactionTicket(secret, doc, reaction, visitor, referrer);
 	const claim = (await readReactionTicket(secret, ticket))!;
 	const verified = await hasVerificationPass(secret, event.cookies.get(VERIFIED_COOKIE) ?? '', visitor);
+	const automatic = verified && await hasAutomaticPass(secret, event.cookies.get(AUTOMATIC_COOKIE) ?? '', visitor);
 	Object.assign(audit, { phase: 'page', submissionId: claim.id, verification: verified ? 'pass' : 'turnstile' });
 	return new Response(reactionPage({
 		action: event.url.pathname + event.url.search, ticket, ticketId: claim.id, siteKey: config.siteKey,
-		doc, verified, returnUrl: result.widget.returnUrl, label: `${selected.emoji} ${selected.label}`
+		doc, verified, automatic, hasVoted, returnUrl: result.widget.returnUrl, label: `${selected.emoji} ${selected.label}`
 	}), { headers: PAGE_HEADERS });
 });
 
@@ -100,6 +103,9 @@ export const POST: RequestHandler = (event) => auditReactionRequest(event, async
 	const config = configuration(event);
 	audit.phase = 'form';
 	const form = await readForm(event.request);
+	const submission = form.get('submission') ?? 'explicit';
+	if (submission !== 'explicit' && submission !== 'automatic' && submission !== 'cancel') error(400, 'Invalid submission mode.');
+	audit.submission = submission;
 	audit.phase = 'ticket';
 	const secret = getHmacSecret(event);
 	const ticket = await readReactionTicket(secret, form.get('ticket') ?? '');
@@ -108,20 +114,43 @@ export const POST: RequestHandler = (event) => auditReactionRequest(event, async
 		error(403, 'This submission is invalid or expired. Please click the badge again.');
 	}
 	Object.assign(audit, { submissionId: ticket.id, source: ticket.referrer, phase: 'verification' });
+	if (submission === 'cancel') {
+		// The signed ticket and visitor cookie authorize undo even after auto permission is unchecked or expires.
+		audit.phase = 'cancellation';
+		const stub = await getReactionDocumentStub(event, doc);
+		audit.voter = await getVoterHash(event, doc);
+		const result = await stub.cancelReaction(reaction, audit.voter, ticket);
+		if (!result.ok) error(result.status, result.message);
+		Object.assign(audit, { phase: 'cancelled', active: result.active, count: result.count });
+		const nextTicket = await createReactionTicket(secret, doc, reaction, visitor, ticket.referrer);
+		return json({ active: result.active, ticket: nextTicket, ticketId: (await readReactionTicket(secret, nextTicket))!.id });
+	}
 	const verified = await hasVerificationPass(secret, event.cookies.get(VERIFIED_COOKIE) ?? '', visitor);
 	audit.verification = verified ? 'pass' : 'turnstile';
+	if (submission === 'automatic' && (!verified || !await hasAutomaticPass(secret, event.cookies.get(AUTOMATIC_COOKIE) ?? '', visitor))) {
+		error(403, 'Automatic submission permission expired or was disabled. Please reload and press Submit Reaction again.');
+	}
 	if (!verified && !await verifyTurnstile(config.secret, form.get('cf-turnstile-response') ?? '', config.hostname, ticket.id)) {
 		error(403, 'Verification failed. Please try the security check again.');
 	}
 	audit.phase = 'vote';
 	const stub = await getReactionDocumentStub(event, doc);
 	audit.voter = await getVoterHash(event, doc);
-	const result = await stub.toggleReaction(reaction, audit.voter, ticket.referrer, { id: ticket.id, expiresAt: ticket.expiresAt });
+	const result = await stub.toggleReaction(reaction, audit.voter, ticket.referrer, { id: ticket.id, expiresAt: ticket.expiresAt, automatic: submission === 'automatic' });
 	if (!result.ok) error(result.status, result.message);
 	Object.assign(audit, { phase: 'accepted', active: result.active, count: result.count });
-	if (!verified) event.cookies.set(VERIFIED_COOKIE, await createVerificationPass(secret, visitor), {
+	const pass = verified ? event.cookies.get(VERIFIED_COOKIE)! : await createVerificationPass(secret, visitor);
+	if (!verified) event.cookies.set(VERIFIED_COOKIE, pass, {
 		path: '/', httpOnly: true, sameSite: 'lax', secure: event.url.protocol === 'https:', maxAge: VERIFICATION_SECONDS
 	});
+	if (submission === 'explicit') {
+		const grant = form.get('automatic') === 'on' ? await createAutomaticPass(secret, pass, visitor) : null;
+		if (grant) event.cookies.set(AUTOMATIC_COOKIE, grant, {
+			// Script may remove this limited grant immediately when the checkbox is unchecked.
+			path: '/', httpOnly: false, sameSite: 'lax', secure: event.url.protocol === 'https:', maxAge: VERIFICATION_SECONDS
+		});
+		else event.cookies.delete(AUTOMATIC_COOKIE, { path: '/' });
+	}
 	if (event.request.headers.get('accept')?.includes('application/json')) return json({ returnUrl: result.returnUrl });
 	redirect(303, result.returnUrl);
 });

@@ -55,10 +55,11 @@ main {
 	border-bottom: 4px solid var(--surface-edge);
 	filter: drop-shadow(0 9px 7px color-mix(in oklab, var(--warm-shadow) 15%, transparent));
 }
-h1 { font-size: 1.5rem; overflow-wrap: anywhere; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
+h1 { font-size: 1.5rem; padding-inline-end: 2rem; overflow-wrap: anywhere; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
+#vote-delta { position: absolute; top: 1rem; right: 1rem; font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
 a { color: inherit; }
 a:hover { color: var(--accent); }
-button {
+.reaction-action {
 	position: absolute;
 	bottom: 0;
 	left: 50%;
@@ -81,13 +82,21 @@ button {
 	cursor: pointer;
 	transition: transform .15s;
 }
-button[hidden] { display: none; }
+[hidden] { display: none !important; }
 button svg { flex-shrink: 0; }
-button:enabled:hover { background: var(--accent); color: var(--accent-foreground); transform: translate(-50%, 50%) scale(1.05); }
+.reaction-action:enabled:hover { background: var(--accent); color: var(--accent-foreground); transform: translate(-50%, 50%) scale(1.05); }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 button:disabled { opacity: .6; cursor: default; }
 #challenge { margin-block: 1rem; }
+#automatic-row { display: flex; align-items: flex-start; gap: .5rem; }
+.automatic-option { display: flex; align-items: flex-start; gap: .6rem; cursor: pointer; }
+.automatic-option input { flex-shrink: 0; width: 1rem; height: 1rem; margin: .2rem 0 0; accent-color: var(--accent); }
+.automatic-option input:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.automatic-help-trigger { position: relative; flex-shrink: 0; margin-left: auto; }
+#automatic-help-button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: help; }
+#automatic-help-button:hover { color: var(--accent); }
+#automatic-help { position: absolute; z-index: 1; bottom: 100%; right: 0; box-sizing: border-box; width: min(18rem, calc(100vw - 6rem)); padding: .75rem; border-radius: .5rem; background: var(--foreground); color: var(--background); font-size: .8rem; line-height: 1.5; box-shadow: 0 3px 10px #0003; }
 #return-link {
 	display: flex;
 	flex-direction: column;

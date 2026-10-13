@@ -6,6 +6,7 @@ export type ReactionAudit = {
 	reaction?: string;
 	submissionId?: string;
 	verification?: 'turnstile' | 'pass';
+	submission?: 'explicit' | 'automatic' | 'cancel';
 	source?: string | null;
 	voter?: string;
 	active?: boolean;

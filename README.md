@@ -16,7 +16,8 @@ The generator creates a random 16-character reaction group ID (64 random bits).
 It stays fixed through edits and regeneration within the current page visit.
 Return URL, Content ID, reactions, and generated output start fresh on reload; a
 new random group ID is created. Only the two Main Card checkboxes, locale, and
-theme are retained between sessions. Old saved drafts are discarded automatically
+theme are retained between sessions in the generator. The reaction page also remembers
+its automatic-submission checkbox preference. Old saved drafts are discarded automatically
 (their source-check preference is migrated). **Randomize reaction group ID** creates a new ID and separate counters;
 previously pasted badges and their votes remain intact. You can instead enter a
 manual group ID (up to 32 letters, numbers, or single separating dashes), or clear
@@ -81,9 +82,23 @@ All GET requests are now read-only for votes. Existing badge links open a small
 verification page. Managed Cloudflare Turnstile runs on the first click, and the
 server validates its token, exact hostname, action, and submission ID before
 accepting a POST. Successful verification sets a signed, HttpOnly cookie for one
-hour. Every reaction requires pressing **Submit Reaction** on the verification
-page, including when that cookie skips another challenge. Completing Turnstile
-only enables the button; it never submits a vote. The existing visitor cookie still identifies
+hour. By default, every reaction requires pressing **Submit Reaction** on the verification
+page, including when that cookie skips another challenge. Users can opt into
+**Temporarily submit future reactions automatically**. The checkbox preference is
+remembered in local storage, but only a successful explicit submission grants a
+separate signed, visitor-bound permission that expires with the verification pass.
+Future reactions then submit immediately when the page opens in a visible tab.
+While the page is still open, **Cancel (Esc)** stops the automatic flow and restores
+the checkbox. Cancellation is bound to that page's signed submission ticket: it
+blocks a vote that has not committed, or reverses that exact automatic vote if it
+has committed. Repeated cancellation is safe, and later votes from another tab
+take precedence. The page stays open with a fresh ticket for manual submission.
+Cancellation failures are shown with a retry option; once navigation has completed,
+the previous page can no longer handle Esc. Unchecking the option removes the
+permission cookie and saved preference. Automatic
+submissions never renew either permission. After expiry, the checkbox stays checked
+but a fresh explicit submission is required. Completing Turnstile alone only enables
+the button. The existing visitor cookie still identifies
 the vote, so verification expiry does not prevent removing an earlier vote.
 
 POSTs require a same-origin request and a signed, visitor-bound ticket valid for
@@ -131,7 +146,7 @@ loads do not fill the log store. No database migration or voting rule is changed
 
 `reaction.request` covers verification-page GETs and vote POSTs, including rejected
 requests. It records the processing phase and HTTP status, group/reaction IDs,
-submission ID, whether verification used Turnstile or the one-hour pass, browser
+submission ID, whether submission was explicit, automatic, or cancellation, whether verification used Turnstile or the one-hour pass, browser
 signature, Fetch Metadata headers, and Cloudflare network/ASN/country information.
 Bot scores are included only when Cloudflare provides them. Source URLs omit
 credentials, query strings, and fragments; missing referrers remain unknown.
@@ -143,6 +158,11 @@ commits, before cache-purge work. `active: true` means added, `false` means remo
 `count` is the resulting total. Replayed tickets produce no additional committed-vote
 event. Match `submissionId` to the request events to identify the verification path
 and source metadata. `voter` is the existing per-document HMAC, not the visitor cookie.
+
+`reaction.cancel` records cancellation and whether it reversed a committed vote.
+Reversals update badge counts and cache publication but do not add another event
+to the cumulative Votes Submitted counter. Cancellation receipts and recent action
+IDs protect against races and retries, and expire with the submission tickets.
 An accepted request alone may be a retry; count committed events instead.
 
 In Cloudflare, open **Workers & Pages → plusmark → Logs**, choose the last two hours,

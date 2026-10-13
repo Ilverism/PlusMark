@@ -36,6 +36,18 @@ export async function hasVerificationPass(secret: string, token: string, visitor
 	return claim?.purpose === 'verified' && claim.visitor === visitor;
 }
 
+export async function createAutomaticPass(secret: string, verificationPass: string, visitor: string, now = Date.now()) {
+	const claim = await read(secret, verificationPass, now);
+	if (claim?.purpose !== 'verified' || claim.visitor !== visitor) return null;
+	// Opting in partway through verification must not extend the original expiry.
+	return sign(secret, { purpose: 'automatic', visitor, expiresAt: claim.expiresAt });
+}
+
+export async function hasAutomaticPass(secret: string, token: string, visitor: string, now = Date.now()) {
+	const claim = await read(secret, token, now);
+	return claim?.purpose === 'automatic' && claim.visitor === visitor;
+}
+
 export function createReactionTicket(secret: string, doc: string, reaction: string, visitor: string, referrer: string | null, now = Date.now()) {
 	return sign(secret, { purpose: 'reaction', id: crypto.randomUUID(), doc, reaction, visitor, referrer, expiresAt: now + 600_000 });
 }

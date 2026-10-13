@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const wranglerRequire = createRequire(require.resolve('wrangler'));
-const { Miniflare } = wranglerRequire('miniflare');
+const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('miniflare');
 const { build } = wranglerRequire('esbuild');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dispatch = `export default {async fetch(request,env) {
@@ -39,7 +39,7 @@ export class ReactionDocument extends DurableObject {
 }
 ${dispatch}`;
 const options = { modules: true, compatibilityDate: '2026-05-23', durableObjects: { REACTION_DOCUMENTS: { className: 'ReactionDocument', useSQLite: true } } };
-const mf = new Miniflare({ ...options, script: legacy });
+const mf = new Miniflare(convertV4MiniflareOptions({ ...options, script: legacy }));
 async function rpc(doc, action, ...args) {
 	const response = await mf.dispatchFetch('https://example.com/test', { method: 'POST', body: JSON.stringify({ doc, action, args }) });
 	assert.equal(response.status, 200);
@@ -51,13 +51,17 @@ const save = (doc, verifyReferrer, editTokenHash = null) => rpc(doc, 'saveWidget
 });
 try {
 	await rpc('legacy', 'seed');
-	await mf.setOptions({ ...options, script: bundle.outputFiles[0].text });
+	await mf.setOptions(convertV4MiniflareOptions({ ...options, script: bundle.outputFiles[0].text }));
 	let legacyWidget = await rpc('legacy', 'getWidget');
 	assert.equal(legacyWidget.widget.verifyReferrer, false);
 	assert.equal(legacyWidget.widget.badgeTheme, 'light');
 	assert.equal(legacyWidget.widget.reactions[0].count, 1);
+	assert.equal(await rpc('legacy', 'hasVote', 'like', 'existing-voter'), true);
+	assert.equal(await rpc('legacy', 'hasVote', 'like', 'other-voter'), false);
+	assert.equal(await rpc('legacy', 'hasVote', 'other-reaction', 'existing-voter'), false);
 	assert.deepEqual(await rpc('legacy', 'getStatistics'), { reactions: 0, votes: 0 }, 'historical activity is not backfilled');
 	assert.equal((await rpc('legacy', 'toggleReaction', 'like', 'existing-voter', 'https://other.example/')).count, 0);
+	assert.equal(await rpc('legacy', 'hasVote', 'like', 'existing-voter'), false);
 	assert.equal((await save('legacy', true, 'wrong')).ok, false);
 	assert.equal((await save('legacy', true, 'secret')).ok, true);
 	assert.deepEqual(await rpc('legacy', 'getStatistics'), { reactions: 0, votes: 1 }, 'legacy badge regeneration does not count as creation');
@@ -69,6 +73,8 @@ try {
 
 	for (const doc of ['doc-g-first', 'doc-g-second']) assert.equal((await save(doc, true)).ok, true);
 	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', 'https://example.com/article')).count, 1);
+	assert.equal(await rpc('doc-g-first', 'hasVote', 'like', 'same-user'), true);
+	assert.equal(await rpc('doc-g-second', 'hasVote', 'like', 'same-user'), false);
 	const denied = await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', 'https://example.com/other');
 	assert.equal(denied.status, 403);
 	assert.equal(denied.returnUrl, 'https://example.com/article#section');
@@ -85,13 +91,38 @@ try {
 	assert.equal(committedLogs[0].count, 1);
 	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'other-user', null, submission)).status, 409);
 	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', null, { id: 'expired', expiresAt: Date.now() - 1 })).status, 410);
-	await mf.setOptions({ ...options, script: bundle.outputFiles[0].text + '\n// restart' });
+	await mf.setOptions(convertV4MiniflareOptions({ ...options, script: bundle.outputFiles[0].text + '\n// restart' }));
+	assert.equal(await rpc('doc-g-first', 'hasVote', 'like', 'same-user'), true);
 	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', null, submission)).count, 1);
 	assert.equal((await rpc('doc-g-first', 'getAuditLogs')).length, 0, 'receipt replay after restart is not a new vote');
 	assert.equal((await rpc('doc-g-first', 'getBadge', 'like')).reaction.count, 1);
 	assert.equal((await rpc('doc-g-first', 'toggleReaction', 'like', 'same-user', null, { ...submission, id: crypto.randomUUID() })).count, 0);
 	assert.equal((await rpc('doc-g-first', 'getWidget')).widget.verifyReferrer, true);
 	assert.equal((await rpc('doc-g-second', 'getBadge', 'like')).reaction.count, 1);
+	await save('cancel-test', false);
+	const auto = () => ({ id: crypto.randomUUID(), expiresAt: Date.now() + 600_000, automatic: true });
+	const cancelledFirst = auto();
+	assert.equal((await rpc('cancel-test', 'cancelReaction', 'like', 'visitor', cancelledFirst)).active, false);
+	assert.equal((await rpc('cancel-test', 'toggleReaction', 'like', 'visitor', null, cancelledFirst)).status, 409, 'cancel arriving first prevents the vote');
+	const added = auto();
+	await rpc('cancel-test', 'toggleReaction', 'like', 'visitor', null, added);
+	await mf.setOptions(convertV4MiniflareOptions({ ...options, script: bundle.outputFiles[0].text + '\n// cancel restart' }));
+	assert.equal((await rpc('cancel-test', 'cancelReaction', 'like', 'other', added)).status, 409);
+	assert.equal((await rpc('cancel-test', 'cancelReaction', 'like', 'visitor', added)).active, false, 'cancellation reverses an addition after restart');
+	assert.equal((await rpc('cancel-test', 'cancelReaction', 'like', 'visitor', added)).active, false, 'repeated cancellation cannot toggle again');
+	await rpc('cancel-test', 'toggleReaction', 'like', 'visitor');
+	const removed = auto();
+	await rpc('cancel-test', 'toggleReaction', 'like', 'visitor', null, removed);
+	assert.equal((await rpc('cancel-test', 'cancelReaction', 'like', 'visitor', removed)).active, true, 'cancellation restores a removed vote');
+	const superseded = auto();
+	await rpc('cancel-test', 'toggleReaction', 'like', 'visitor', null, superseded);
+	await rpc('cancel-test', 'toggleReaction', 'like', 'visitor', null, auto());
+	await rpc('cancel-test', 'toggleReaction', 'like', 'visitor', null, auto());
+	assert.equal((await rpc('cancel-test', 'cancelReaction', 'like', 'visitor', superseded)).active, false, 'cancellation must not change later votes, even after an add/remove cycle');
+	assert.equal((await rpc('cancel-test', 'getWidget')).widget.reactions[0].count, 0);
+	const race = auto();
+	await Promise.all([rpc('cancel-test', 'toggleReaction', 'like', 'visitor', null, race), rpc('cancel-test', 'cancelReaction', 'like', 'visitor', race)]);
+	assert.equal(await rpc('cancel-test', 'hasVote', 'like', 'visitor'), false, 'vote/cancel race leaves the original state');
 	console.log('PASS: production SQLite migration, legacy votes/tokens, guard updates/persistence, rejected undo, independent groups, unknown sources, restart');
 } finally {
 	await mf.dispose();

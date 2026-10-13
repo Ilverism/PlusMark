@@ -7,11 +7,14 @@
 		__instructions_step_3
 	} from "$lib/paraglide/messages";
     import { Handshake, Info, TriangleAlert } from "@lucide/svelte";
+
+	let accordionTarget = $state("");
+
 </script>
 
 <aside class="instructions-panel" aria-label={__instructions_header()}>
-	<Accordion.Root type="single" id="instructions-accordion" class="rounded-l-none">
-		<Accordion.Item value="instructions">
+	<Accordion.Root type="single" id="accordion-usage-instructions" class="rounded-l-none" bind:value={accordionTarget}>
+		<Accordion.Item value="usage-instructions">
 			<Accordion.Trigger level={2} class="items-center focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
 				<Info />
 				<!-- {__instructions_header()} -->
@@ -24,8 +27,8 @@
 					<li>{__instructions_step_3()}</li> -->
 					<!-- <li>Add all of the <b>Reactions</b> you want and choose their icons.</li> -->
 					<li>Use the <b>Add Reaction</b> button to add all of the new reactions you want, then choose their names and icons.</li>
-					<li>Enter the <b>Return URL</b> where the user will be redirected to when clicked (should be the same page where the reactions are displayed).</li>
-					<li>Enter the <b>Content ID</b> and <b>Reaction Group ID</b> that are used to identify the group of generated reactions.</li>
+					<li>Enter the <b>Return URL</b> where the user will be redirected to when clicked <i>(should be the same page where the reactions will be displayed)</i>.</li>
+					<li>Enter the <b>Content ID</b> & <b>Reaction Group ID</b>, which are used to identify the group of generated reactions.</li>
 					<li>Click the <b>Generate</b> button.</li>
 					<li>Click the <b>Copy</b> button, then paste the generated Markdown content into your document.</li>
 				</ol>
@@ -33,8 +36,8 @@
 		</Accordion.Item>
 	</Accordion.Root>
 
-	<Accordion.Root type="single" id="instructions-accordion" class="rounded-l-none">
-		<Accordion.Item value="instructions">
+	<Accordion.Root type="single" id="accordion-usage-warnings" class="rounded-l-none" bind:value={accordionTarget}>
+		<Accordion.Item value="usage-warnings">
 			<Accordion.Trigger level={2} class="items-center focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
 				<TriangleAlert />
 				Usage Warnings
@@ -49,17 +52,17 @@
 		</Accordion.Item>
 	</Accordion.Root>
 
-	<Accordion.Root type="single" id="instructions-accordion" class="rounded-l-none">
-		<Accordion.Item value="instructions">
+	<Accordion.Root type="single" id="accordion-usage-guidelines" class="rounded-l-none" bind:value={accordionTarget}>
+		<Accordion.Item value="usage-guidelines">
 			<Accordion.Trigger level={2} class="items-center focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
 				<Handshake />
 				Usage Guidelines
 			</Accordion.Trigger>
 			<Accordion.Content>
 				<ul class="instructions-steps list-disc!">
-					<li>Do not use PlusMark to promote or vote on hateful, inappropriate, or harmful content.</li>
-					<li>Do not use PlusMark to manipulate, harass, or mislead others.</li>
-					<li>Do not use PlusMark excessively or in a way that could be considered spammy.</li>
+					<li><b>Do not</b> use PlusMark to promote or vote on hateful, inappropriate, or harmful content.</li>
+					<li><b>Do not</b> use PlusMark to manipulate, harass, or mislead others.</li>
+					<li><b>Do not</b> use PlusMark excessively or in a way that could be considered spammy.</li>
 				</ul>
 			</Accordion.Content>
 		</Accordion.Item>

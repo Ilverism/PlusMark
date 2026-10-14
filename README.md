@@ -1,360 +1,182 @@
-[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb&r=thumbs-up) [![🔥 Fire](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb&r=fire)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb&r=fire) [![😍 Love It](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb&r=love-it)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb&r=love-it) [![Source: https://github.com/Ilverism/PlusMarkTest](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmarktest-g-94c35593506ad1bb)](<https://github.com/Ilverism/PlusMarkTest>) [![PlusMark](https://plusmark.ilverism.workers.dev/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)
+# PlusMark
+<sup>ver. 2026-10.13 (Beta)</sup>
 
-# sv
+<br>
+🔧 This document and service are both a work in progress.
 
-## Service statistics
+---
+### About
 
-The homepage shows **Reactions Generated / Votes Submitted**, tracked from deployment of the statistics feature. A distinct reaction ID within a group counts once, even if removed and re-added. Regeneration, image requests, source badges, and branding badges do not count. Accepted votes and removals count as submissions; rejected requests and retries of the same submission do not. Existing badges and historical votes are not backfilled.
+PlusMark provides a way for you to **embed inline reactions** inside MarkDown files.
 
-Production counters persist in SQLite Durable Objects. Each group records counters alongside the corresponding mutation, then sends cumulative snapshots through its alarm scheduler, batched for 60 seconds. Duplicate or older snapshots are ignored. Failed deliveries retry after five minutes without blocking voting. The read-only `/api/statistics` response is cached for 60 seconds; the homepage refreshes once a minute while visible, so normal display lag can be a few minutes. Local Vite totals use the development in-memory store and reset with the server.
+Reactions are rendered as images that appear around or alongside other text; when clicked, users are temporarily brought to an external page where they can verify & submit their vote, before being automatically redirected back to the source page.
 
-Deployment requires the `v2_service_statistics` migration and `SERVICE_STATISTICS` binding in `wrangler.jsonc`; the build exports the new Durable Object automatically. No additional secret is required.
+The MarkDown content will not actually be changed in any way. Instead, the image contained in the link will be updated.
 
-## Reaction groups and source checks
+[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8e8b72858473d86a&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8e8b72858473d86a&r=thumbs-up) [![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8e8b72858473d86a&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8e8b72858473d86a&r=thumbs-down) [![✅ Check Mark Button](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8e8b72858473d86a&r=check-mark-button)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8e8b72858473d86a&r=check-mark-button) [![🧠 Brain](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8e8b72858473d86a&r=brain)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8e8b72858473d86a&r=brain) [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-8e8b72858473d86a&theme=dark&v=2)](<https://github.com/Ilverism/PlusMark>)
 
-The generator creates a random 16-character reaction group ID (64 random bits).
-It stays fixed through edits and regeneration within the current page visit.
-Return URL, Content ID, reactions, and generated output start fresh on reload; a
-new random group ID is created. Only the two Main Card checkboxes, locale, and
-theme are retained between sessions in the generator. The reaction page also remembers
-its automatic-submission checkbox preference. Old saved drafts are discarded automatically
-(their source-check preference is migrated). **Randomize reaction group ID** creates a new ID and separate counters;
-previously pasted badges and their votes remain intact. You can instead enter a
-manual group ID (up to 32 letters, numbers, or single separating dashes), or clear
-the field to use a legacy Content ID without a suffix. IDs are case-insensitive.
+---
+### Usage
 
-The generated badge ID is `<normalized-content-id>-g-<group-id>`. The existing
-`doc` and `r` URL parameters and storage namespace are unchanged. Combined IDs
-over 120 characters are rejected, not truncated. The Badge ID preview shows the
-actual key. Reusing that key reuses the group, whether it was entered manually or
-generated. Group IDs reduce accidental collisions; they are not secrets or access
-tokens. Copying a badge copies its group identity too.
+##### Creating new reactions & adding them to files:
+1. Use the **Add Reaction** button to add all of the new reactions you want, then choose their names and icons.
+2. Paste/enter the **Return URL** where the user will be redirected to when clicked _(should be the same page where the reactions will be displayed)_.
+3. Enter the **Content ID**<sup>1</sup> & **Reaction Group ID**<sup>2</sup>, which are used to identify the group of generated reactions.
+4. Click the **Generate** button.
+5. Click the **Copy** button, then paste the generated Markdown content into your document.
 
-**Reject votes from other URLs** defaults on in new generator drafts. The server checks
-the HTTP `Referer` inside the same transaction that adds/removes the vote. A
-different origin or page path returns 403 without changing the vote, with a link
-to the intended page. Configured query parameters must match (including repeated
-values); extra query parameters are allowed. Fragments are ignored, so comments
-and sections on the same page cannot be distinguished. Paths remain exact,
-including trailing slashes; alternate renderings such as a GitHub README on the
-repository landing page need the check disabled if one group must work at both
-URLs. The Return URL retains its fragment for navigation back to the section.
+<sup>1.</sup> *Identifies the page/content where the Reactions will be entered. By default, this will be an automatically-generated reformatted copy of the Return URL.*
 
-Missing, malformed, non-HTTP, and same-origin origin-only referrers are treated
-as unknown and allowed. This is a best-effort guard against accidental reuse and
-ordinary clicks from other pages, not authentication: clients can omit or forge
-the header. Image requests are not restricted because Camo strips source context.
+<sup>2.</sup> *A unique identifier for the specific group of Reactions being generated. Including this helps support the inclusion of multiple reaction groups in a single page/document.*
 
-### Compatibility policy
+<br>
 
-- Existing badge URLs, stored counts, voter identities, and edit tokens continue
-  working. Browser edit tokens now use tab-scoped session storage; old locally
-  stored tokens are moved there. They survive reloads, but a new tab session does
-  not retain edit access to previously generated groups. An additive SQLite column defaults existing widgets to source checks
-  **off**. No database reset or badge regeneration is required.
-- API creates that omit `verifyReferrer` also default off. Authorized updates that
-  omit it preserve the current setting; only an explicit boolean changes it.
-  Enabling it for an old widget requires its existing edit token.
-- To edit an old widget in the generator, enter its old Content ID, clear the
-  group ID, and choose the source-check setting intentionally. Changing the
-  group ID creates a different widget; it does not migrate votes.
-- Prefer additive fields and opt-in migrations for already published Markdown.
-  An incompatible URL/key change should use a versioned contract and a migration
-  plan. During this private testing phase, a documented reset can be reasonable
-  with explicit owner approval; it should never happen silently during deployment.
+##### Voting on reactions in files:
+1. Click on the badge to begin updating your vote.
+2. Wait for the Cloudflare Turnstile to verify your visit.
+3. Optional: Use the checkbox to temporarily submit future reactions automatically *(useful if you plan to interact with multiple reactions in succession).* Automatic vote submissions can be halted by pressing **Esc** or using the **Cancel** button.
+4. Click the **Submit Reaction** button.
+	If you haven't voted on the reaction before, its count will increase by one. If you already have, the vote will be removed and the count will decrease by one.
+5. You will then be automatically redirected to the **Return URL**.. If configured correctly, this should link to the same place where you clicked on the badge.
 
-Validation: `node --test scripts/test-reaction-location.mjs` checks matching and
-identity edge cases; `node scripts/test-reaction-location-runtime.mjs` runs the
-production Durable Object against a populated legacy SQLite schema, including
-restart persistence. `src/routes/reaction-groups.e2e.ts` covers the form, API,
-fresh form state, checkbox preferences, separate counters, and real browser navigation.
+[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-064cf98394b0d940&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-064cf98394b0d940&r=thumbs-up) [![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-064cf98394b0d940&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-064cf98394b0d940&r=thumbs-down) [![✅ Check Mark Button](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-064cf98394b0d940&r=check-mark-button)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-064cf98394b0d940&r=check-mark-button) [![🧠 Brain](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-064cf98394b0d940&r=brain)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-064cf98394b0d940&r=brain) [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-064cf98394b0d940&theme=dark&v=2)](<https://github.com/Ilverism/PlusMark>)
 
-## Automated reaction requests
+---
+### Reactions, Badges, and Formatting
 
-`HEAD /react` and GET requests explicitly marked as `prefetch` or `prerender`
-in `Sec-Purpose`, `Purpose`, `X-Purpose`, or `X-Moz` return an empty 204 response.
-They do not create a voter cookie, change a vote, or redirect. Reaction responses
-use `Cache-Control: no-store` so a skipped request or voting redirect is not
-reused for a subsequent click. `robots.txt` disallows `/react`, and reaction
-responses include `X-Robots-Tag: noindex, nofollow` to discourage indexing.
+* Multiple *reactions* can be added to a group at once. By default, the generator page will include **👍 Thumbs Up** and **👎 Thumbs Down** reactions.
+* New reactions can be added by clicking the **Add Reaction** button. Existing ones can be removed by clicking the symbol on the top right of the corresponding card.
+* Each reaction has an emoji, name, and description that can be modified.
 
-All GET requests are now read-only for votes. Existing badge links open a small
-verification page. Managed Cloudflare Turnstile runs on the first click, and the
-server validates its token, exact hostname, action, and submission ID before
-accepting a POST. Successful verification sets a signed, HttpOnly cookie for one
-hour. By default, every reaction requires pressing **Submit Reaction** on the verification
-page, including when that cookie skips another challenge. Users can opt into
-**Submit future reactions automatically (temporary)**. The checkbox preference is
-remembered in local storage, but only a successful explicit submission grants a
-separate signed, visitor-bound permission that expires with the verification pass.
-Future reactions then submit immediately when the page opens in a visible tab.
-While the page is still open, **Cancel (Esc)** stops the automatic flow and restores
-the checkbox. Cancellation is bound to that page's signed submission ticket: it
-blocks a vote that has not committed, or reverses that exact automatic vote if it
-has committed. Repeated cancellation is safe, and later votes from another tab
-take precedence. The page stays open with a fresh ticket for manual submission.
-Cancellation failures are shown with a retry option; once navigation has completed,
-the previous page can no longer handle Esc. Unchecking the option removes the
-permission cookie and saved preference. Automatic
-submissions never renew either permission. After expiry, the checkbox stays checked
-but a fresh explicit submission is required. Completing Turnstile alone only enables
-the button. The existing visitor cookie still identifies
-the vote, so verification expiry does not prevent removing an earlier vote.
+<br>
 
-POSTs require a same-origin request and a signed, visitor-bound ticket valid for
-ten minutes. The original badge-page referrer is carried in that ticket and
-checked again at voting time. Submission receipts commit atomically with votes;
-retries cannot accidentally undo the same click, including after a server restart.
-Expired receipts are removed on subsequent submissions. Badge images remain
-public and require no Turnstile check. JavaScript and cookies are required to vote.
-Existing URLs, votes, and edit tokens are preserved; direct GET-based voting API
-clients must move to the verified flow. Previous automated votes are not removed.
-Turnstile reduces automated voting but does not guarantee a unique human or stop
-every browser scanner. Explicit submission prevents passive page loads from voting,
-but automation that deliberately submits the form may still vote.
+* Users can choose to include/exclude "extra" pieces of information when generating the badges with additional options:
+	* **Include ID tag**: Adds an additional string of text to identify the full ID (Content ID + Reaction Group ID) for the reaction group: <br><sup><sub><code>example-content-g-0123456789abcdef</code></sub></sup>
+	* **Include source badge**: Adds an additional badge that displays the selected Return URL and the target site's icon (if applicable). This takes up more space, but can help voting users know if the reactions will actually link to the correct site.
+	* **Include PlusMark badge**: Links to the [PlusMark](https://plusmark.ilverism.workers.dev/) site.
 
-The public `TURNSTILE_SITE_KEY` and exact production `TURNSTILE_HOSTNAME` live in
-`wrangler.jsonc`. Store `TURNSTILE_SECRET` in the Worker secret binding and ignored
-local `.env`. The widget must permit the production hostname and local test hosts.
-Production never accepts a token for localhost; missing configuration fails closed.
-`pnpm preview` explicitly overrides the expected hostname to `localhost` for local
-production-build testing at `http://localhost:4173`.
-Keep `PLUSMARK_HMAC_SECRET` stable, since it also preserves existing vote identities.
-Do not deploy this route until the Turnstile secret is configured.
 
-Validation: `node --test scripts/test-reaction-verification.mjs`,
-`node scripts/test-reaction-route.mjs`, and
-`node scripts/test-reaction-location-runtime.mjs` cover verification, expiry,
-CSRF, replay protection, legacy data, and persisted production SQLite receipts.
-Browser tests cover the verification page, rejected tokens, retry handling, and
-read-only link visits. A real-widget browser check is also needed after deployment.
-`node scripts/test-reaction-page.mjs` checks explicit confirmation with a mocked
-widget, pass reuse, expiry, retries, keyboard activation, and responsive layout.
+<br>
 
-For styling, open `/react/preview` on the Vite dev server (for example,
-`http://localhost:4000/react/preview`). Add `?verified=1` to preview the ready
-message and enabled button. Both use the real page markup and `static/reaction-verification.css`;
-refresh after edits. This static preview loads no Turnstile, creates no votes,
-and stays on screen. It requires no keys or saved reaction group and returns 404
-in production builds, including `pnpm preview`.
+* Several **Formatting** options are available, which change how the badges are presented inside the document: *Row, Column, Table (No descriptions), Table (With descriptions)*. Examples will be provided below.
+* A **Badge Theme** can be selected, which changes the background and border colors of the rendered badges. There are 3 currently available: *Light, Dark, Soft Dark* (based on GitHub color theme options). The site will automatically default to *Light* or *Dark* based on your browser theme settings.
 
-## Passive vote diagnostics
+[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-0b88b18290da5de3&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-0b88b18290da5de3&r=thumbs-up) [![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-0b88b18290da5de3&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-0b88b18290da5de3&r=thumbs-down) [![✅ Check Mark Button](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-0b88b18290da5de3&r=check-mark-button)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-0b88b18290da5de3&r=check-mark-button) [![🧠 Brain](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-0b88b18290da5de3&r=brain)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-0b88b18290da5de3&r=brain) [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-0b88b18290da5de3&theme=dark&v=2)](<https://github.com/Ilverism/PlusMark>)
 
-Workers Logs persist structured `reaction.request` and `reaction.vote` events with
-100% head sampling. Automatic invocation logs are disabled so routine badge image
-loads do not fill the log store. No database migration or voting rule is changed.
+---
+### Badge Format Examples
 
-`reaction.request` covers verification-page GETs and vote POSTs, including rejected
-requests. It records the processing phase and HTTP status, group/reaction IDs,
-submission ID, whether submission was explicit, automatic, or cancellation, whether verification used Turnstile or the one-hour pass, browser
-signature, Fetch Metadata headers, and Cloudflare network/ASN/country information.
-Bot scores are included only when Cloudflare provides them. Source URLs omit
-credentials, query strings, and fragments; missing referrers remain unknown.
-These signals help investigate scanners, but do not establish a person's identity.
-Custom audit fields exclude raw IPs, cookies, request bodies, and verification tokens.
+* Include ID tag: ***On***
+* Include source badge: ***On***
+* Include PlusMark badge: ***On***
+* Badge Theme: ***Light***
 
-`reaction.vote` is emitted by the Durable Object only after a vote transaction
-commits, before cache-purge work. `active: true` means added, `false` means removed;
-`count` is the resulting total. Replayed tickets produce no additional committed-vote
-event. Match `submissionId` to the request events to identify the verification path
-and source metadata. `voter` is the existing per-document HMAC, not the visitor cookie.
+***Row*** *formatting*:
 
-`reaction.cancel` records cancellation and whether it reversed a committed vote.
-Reversals update badge counts and cache publication but do not add another event
-to the cumulative Votes Submitted counter. Cancellation receipts and recent action
-IDs protect against races and retries, and expire with the submission tickets.
-An accepted request alone may be a retry; count committed events instead.
+[![🔥 Fire](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=fire)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=fire) [![❤️ Red Heart](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=red-heart)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=red-heart) [![🤔 Thinking Face](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=thinking-face)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=thinking-face) [![🐈 Cat](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=cat)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=cat) [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&theme=light&v=2)](<https://github.com/Ilverism/PlusMark>) [![PlusMark](https://plusmark.ilverism.workers.dev/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)
 
-In Cloudflare, open **Workers & Pages → plusmark → Logs**, choose the last two hours,
-filter `event` to `reaction.vote`, and filter `doc` to the affected full group ID.
-Look up its `submissionId` in `reaction.request` events. Repeated additions from
-different voter hashes with the same browser/network are worth investigating, but
-are not automatically classified as abuse. Collection continues without a local
-terminal. The [documented retention](https://developers.cloudflare.com/workers/observability/logs/workers-logs/#pricing)
-is three days on Free and seven on Paid as of October 2026, subject to plan limits.
-Logs are diagnostic evidence, not a transactional audit database: platform logging
-limits or process failures can still leave gaps. Set `observability.enabled` to
-`false` and redeploy to stop retained logging after investigation.
+<sup><sub><code>github-com-ilverism-plusmark-g-8801fd4a28884c70</code></sub></sup>
 
-## Badge appearance and counts
+***Column*** *formatting*:
 
-Reaction badges include a two-color destination dot derived from the normalized,
-stored Return URL (including query and fragment). The optional source badge uses
-the same dot, shows a shortened destination, and links directly to that URL.
-It follows the reactions and precedes the PlusMark branding badge, which has no
-dot. The source checkbox defaults on for each new session; it does not persist
-additional form state. Dots identify destinations, not groups or verified origins,
-and similar colors are possible. The complete destination is included in badge
-titles and generated source-image alt text. Count, hourglass, and dot have separate
-reserved spaces.
+[![🔥 Fire](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=fire)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=fire)
 
-Source favicons are fetched server-side using Google's favicon service, sending
-only the hostname. Only bounded PNG responses from the provider's allowed hosts
-are embedded, with a link icon fallback for missing icons or failed lookups.
-The Worker caches successful icons for a day and failed lookups for ten minutes.
-No third-party image is loaded by the viewer inside the SVG, and reaction badge
-requests never fetch favicons. The provider is best-effort and needs no API key.
-Regenerate existing Markdown to add a source badge, or after changing a Return URL
-so the source link updates too. Old reaction links continue working and acquire
-their dots when their images refresh; throttled snapshots may lag until expiry.
+[![❤️ Red Heart](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=red-heart)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=red-heart)
 
-Reaction badges add a subtle shadow behind the emoji. Counts below 1,000 remain
-exact; larger counts are truncated to one decimal place using `k`, `m`, `b`, or
-`t` (trailing `.0` is omitted). For example, 2,315 and 2,388 both display `2.3k`,
-while 1,323,521 displays `1.3m`. Storage and API responses retain the exact total.
-Votes only queue the fallback Camo purge when the displayed count or throttle indicator changes;
-pending purges and retries are preserved when subsequent votes stay in that range.
+[![🤔 Thinking Face](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=thinking-face)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=thinking-face)
 
-By default, generated Markdown ends with a logo-only PlusMark badge on the
-Tailwind `orange-200` background, linking to the hosted PlusMark site. The
-"Include PlusMark badge" checkbox below Content ID controls its inclusion and
-remembers the choice in local storage for this browser.
-Previously pasted Markdown needs regeneration or the logo link appended manually.
+[![🐈 Cat](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=cat)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=cat)
 
-## Busy-traffic badge updates
+[![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&theme=light&v=2)](<https://github.com/Ilverism/PlusMark>)
 
-At 300 accepted add/remove actions within a per-reaction 60-second traffic window,
-the badge enters throttled mode. Votes still update the exact count immediately,
-but the public badge publishes a snapshot at most once every 60 seconds, with a
-small gray hourglass indicating delayed counts. A qualifying busy window extends
-the cooldown; when it expires, a Durable Object alarm publishes the final count
-and removes the indicator, even if nobody requests the badge again. Entering and
-leaving throttled mode are additional publications, including when compact counts
-such as `2.3k` remain unchanged. Quiet reactions remain live.
+<sup><sub><code>github-com-ilverism-plusmark-g-8801fd4a28884c70</code></sub></sup>
 
-Throttled SVG responses are cached internally at the Cloudflare edge until the
-next scheduled publication, avoiding Durable Object reads on cache hits. The
-outgoing headers remain `no-cache`/`no-store`; Camo retains its existing purge
-budgets (15 minutes per target, eight attempts per document per hour). Neither a
-60-second snapshot interval nor the hourglass guarantees GitHub refreshes within
-60 seconds. Existing cached images may initially omit the indicator.
+[![PlusMark](https://plusmark.ilverism.workers.dev/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/)
 
-Thresholds are defined in `src/lib/server/badge-throttle.ts`. Throttle state is
-stored in the additive `badge_publications` SQLite table; existing votes and
-counts are preserved. Development mode uses the same policy but refreshes lazily
-on badge reads. This protects refresh workload, not vote integrity: it does not
-reject automated votes or eliminate incoming Worker request charges.
 
-## GitHub reaction image freshness
+***Table (No descriptions)*** *formatting*:
 
-The `/badge` endpoint must send `Cache-Control: max-age=0, no-cache, no-store,
-must-revalidate`. In live tests, GitHub's Camo proxy cached responses without
-`max-age=0` despite the other directives. Keep the explicit zero TTL.
+|                                                                                                             Fire                                                                                                             |                                                                                                                  Red Heart                                                                                                                  |                                                                                                                      Thinking Face                                                                                                                      |                                                                                                            Cat                                                                                                            |                                                                                                                                                  Source                                                                                                                                                  |                                                    PlusMark                                                     |
+| :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------------------------: |
+| [![🔥 Fire](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=fire)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=fire) | [![❤️ Red Heart](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=red-heart)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=red-heart) | [![🤔 Thinking Face](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=thinking-face)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=thinking-face) | [![🐈 Cat](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=cat)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=cat) | [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&theme=light&v=2)](<https://github.com/Ilverism/PlusMark>)<br/><sup><sub><code>github-com-ilverism-plusmark-g-8801fd4a28884c70</code></sub></sup> | [![PlusMark](https://plusmark.ilverism.workers.dev/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/) |
 
-After deploying this change, an image cached with the old headers may need a
-**one-time** `PURGE` request to its exact `camo.githubusercontent.com` URL. Changing
-the origin headers does not invalidate an existing proxy response. A new query
-parameter in the Markdown's image URL also creates a new cache key, but does not
-need to change on each reaction once the corrected headers are in effect.
+***Table (With descriptions)*** *formatting*:
 
-Counts update when an image is requested (page load/reload or return after a
-reaction). An already-open GitHub page does not poll for changes. The automatic
-purge fallback is rate-limited; transient failures retry without dropping votes
-arriving during an in-flight purge. It cannot discover images on private GitHub
-pages without access.
+|                                                                                                             Fire                                                                                                             |                                                                                                                  Red Heart                                                                                                                  |                                                                                                                      Thinking Face                                                                                                                      |                                                                                                            Cat                                                                                                            |                                                                                                      Source                                                                                                       |                                                    PlusMark                                                     |
+| :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------------------------: |
+| [![🔥 Fire](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=fire)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=fire) | [![❤️ Red Heart](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=red-heart)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=red-heart) | [![🤔 Thinking Face](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=thinking-face)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=thinking-face) | [![🐈 Cat](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=cat)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&r=cat) | [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-8801fd4a28884c70&theme=light&v=2)](<https://github.com/Ilverism/PlusMark>) | [![PlusMark](https://plusmark.ilverism.workers.dev/PlusMark-badge.svg)](https://plusmark.ilverism.workers.dev/) |
+|                                                                                                       This is awesome!                                                                                                       |                                                                                                                I love this!                                                                                                                 |                                                                                                                        I see...                                                                                                                         |                                                                                                        Uh... Meow?                                                                                                        |                                                                <sup><sub><code>github-com-ilverism-plusmark-g-8801fd4a28884c70</code></sub></sup>                                                                 |                                                                                                                 |
 
-### Repeatable validation
+Note that some formats may appear broken or different from what is expected depending on the renderer.
 
-Requires Node.js 24+ and the project's Playwright Chromium installation.
+[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=thumbs-up) [![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=thumbs-down) [![✅ Check Mark Button](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=check-mark-button)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=check-mark-button) [![🧠 Brain](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=brain)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=brain) [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&theme=dark&v=2)](<https://github.com/Ilverism/PlusMark>)
 
-```sh
-node --test scripts/test-badges.mjs scripts/test-camo-purge.mjs
-node scripts/test-badge-throttle.mjs # Local workerd/SQLite/cache check; includes a 65-second cooldown
-pnpm exec playwright test
-node scripts/probe-github-cache.mjs https://plusmark.ilverism.workers.dev
-node scripts/probe-browser-cache.mjs https://plusmark.ilverism.workers.dev
-```
+---
+### Supported Sites/Content
 
-The live probes create isolated widgets and remove their test votes afterward
-(the empty test widgets remain). GitHub's Markdown API supplies real Camo URLs;
-the probes reuse those URLs without cache-busting or repeated purges. A non-GitHub
-return URL prevents automatic purges from masking the result. The browser probe
-serves GitHub-rendered HTML on localhost and exercises two separate visitors,
-12 reaction clicks and 12 observer reloads with normal browser caching enabled.
-It tests the real image proxy, not GitHub's surrounding page/navigation code.
-JSON measurements and a browser screenshot are saved in `.cache-probes/`.
+For PlusMark to work, the target document must be able to render images from foreign URLs. Because of this, some sites, such as Reddit, cannot be used properly with PlusMark. Additionally, sites may cache images, freezing or delaying the displayed vote counts for viewers compared to the actual values.
 
-Acceptance target: every tested change visible on the first load within five
-seconds. On October 8, 2026, the pre-fix image remained stale for over 60 seconds;
-after propagation, the header fix passed all 26 browser image loads in 0.22–0.79
-seconds. A pre-existing stale image passed three changes in 0.42–0.43 seconds after
-one purge. These measurements cover one network region, not a global latency SLA.
+The columns below will be updated after verifying the support status of other sites.
 
-The existing Thumbs Up/Thumbs Down URLs supplied from the issue were also tested
-through Camo with a browser: four count changes appeared on the first reload in
-0.22–2.30 seconds, and both test votes were removed. They already had the new
-headers and needed no purge. One initial browser run timed out waiting for an
-image response; a diagnostic run and the repeat completed successfully. The
-private GitHub issue itself was inaccessible to the test browser, so navigation
-within GitHub's authenticated UI still needs a manual check.
+| Supported         | Partially Supported | Unsupported       |
+| ----------------- | ------------------- | ----------------- |
+| • GitHub<br>• ... | • ...               | • Reddit<br>• ... |
 
-## Emoji picker performance
-
-The picker lazily loads and reuses its immutable catalog. An IntersectionObserver
-reveals emoji artwork within the scroll area plus one nearby row; all buttons stay
-in the DOM for native keyboard navigation. Offscreen artwork uses
-`content-visibility: hidden` until revealed. Per-emoji forced graphics layers and
-blurred text shadows are removed, and panel transitions take 120 ms in / 80 ms out.
-
-Run `pnpm exec playwright test` for category, scrolling, keyboard selection,
-search, and rapid reopen coverage. To reproduce the performance measurements,
-build with `pnpm build`, run `pnpm preview`, then in another terminal run:
-
-```sh
-node scripts/profile-emoji-picker.mjs http://127.0.0.1:4173 local
-```
-
-The probe uses Chromium with 4x CPU throttling, three interaction cycles, and
-writes JSON and a screenshot to `.cache-probes/`. `nextPaintMs` estimates click
-response using animation frames; `readyPaintMs` waits for emoji content to be
-revealed (or the closing panel to be removed), then allows painting. These are
-lab estimates, not field INP measurements.
-
-Hosted measurements on October 8, 2026: large category content appeared in
-272–308 ms on the first visit and about 102–118 ms on repeat visits, versus
-740–942 ms before the change. Closing took about 136 ms instead of 365–388 ms.
-The initial catalog/font load still took about 281 ms. Results depend on browser,
-hardware, fonts, and network; Firefox and Safari were not profiled.
+[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-ae6e19df558a1c0e&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-ae6e19df558a1c0e&r=thumbs-up) [![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-ae6e19df558a1c0e&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-ae6e19df558a1c0e&r=thumbs-down) [![✅ Check Mark Button](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-ae6e19df558a1c0e&r=check-mark-button)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-ae6e19df558a1c0e&r=check-mark-button) [![🧠 Brain](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-ae6e19df558a1c0e&r=brain)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-ae6e19df558a1c0e&r=brain) [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-ae6e19df558a1c0e&theme=dark&v=2)](<https://github.com/Ilverism/PlusMark>)
 
 ---
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+### Other Features
 
-## Creating a project
+* All generated badges include a semi-unique color gradient based on the Return URL. These help viewers confirm that the reactions correspond to the correct/expected Return URL when the **Include source badge** option is enabled. <img width="24" height="24" alt="PlusMarkDotExample" src="https://github.com/user-attachments/assets/3f830fa1-886b-4fc9-93f6-718cec93c325" />
+* The **Reject votes from other URLs** option (enabled by default) helps protect against a limited number of cases where the voter's Referer header has a mismatch with the Return URL. This **cannot** be used to reliably ensure that a vote is coming from the same page as the Return URL.
+* Reactions with large counts will have their displayed values truncated. For example, reactions with `2,300` and `2,367` votes will both display `2.3k` in the image.
+* Reactions with an extreme number of updates in a short period will temporarily go into a rate-limited mode: All votes are still recorded, but the reaction's image will only be regenerated periodically. Rate-limited badges will appear with an hourglass icon.
 
-If you're seeing this, you've probably already done this step. Congrats!
+[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-a7094a2930aa0ee8&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-a7094a2930aa0ee8&r=thumbs-up) [![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-a7094a2930aa0ee8&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-a7094a2930aa0ee8&r=thumbs-down) [![✅ Check Mark Button](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-a7094a2930aa0ee8&r=check-mark-button)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-a7094a2930aa0ee8&r=check-mark-button) [![🧠 Brain](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-a7094a2930aa0ee8&r=brain)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-a7094a2930aa0ee8&r=brain) [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-a7094a2930aa0ee8&theme=dark&v=2)](<https://github.com/Ilverism/PlusMark>)
 
-```sh
-# create a new project
-npx sv create my-app
-```
+---
+### Usage Warnings
 
-To recreate this project with the same configuration:
+- Anyone can duplicate and use any generated reactions in any document. This can be partially mitigated by keeping **Reject votes from other URLs** enabled.
+- Reactions are vulnerable to being spammed. The same user using multiple browsers or devices can interact with the same reaction multiple times.
+- Existing protections are intended to guard against automated crawlers and bot activity, and may not be effective against targeted spam efforts.
+- If you close the tab after generating your reactions, they can no longer be edited. A new set of reactions will need to be generated with a new Reaction Group ID.
 
-```sh
-# recreate this project
-pnpm dlx sv@0.15.3 create --template minimal --types ts --add eslint playwright tailwindcss="plugins:none" sveltekit-adapter="adapter:cloudflare+cfTarget:workers" drizzle="database:sqlite+sqlite:libsql" mdsvex paraglide="languageTags:en, es+demo:no" mcp="ide:vscode+setup:remote" --install pnpm PlusMark
-```
+[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-0878d9438b08be3a&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-0878d9438b08be3a&r=thumbs-up) [![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-0878d9438b08be3a&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-0878d9438b08be3a&r=thumbs-down) [![✅ Check Mark Button](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-0878d9438b08be3a&r=check-mark-button)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-0878d9438b08be3a&r=check-mark-button) [![🧠 Brain](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-0878d9438b08be3a&r=brain)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-0878d9438b08be3a&r=brain) [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-0878d9438b08be3a&theme=dark&v=2)](<https://github.com/Ilverism/PlusMark>)
 
-## Developing
+---
+### Usage Guidelines
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+- **Do not** use PlusMark to promote or vote on hateful, inappropriate, or harmful content.
+- **Do not** use PlusMark to manipulate, harass, or mislead others.
+- **Do not** use PlusMark excessively or in a way that could be considered spammy.
 
-```sh
-npm run dev
+[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-de7d614d04dcabee&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-de7d614d04dcabee&r=thumbs-up) [![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-de7d614d04dcabee&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-de7d614d04dcabee&r=thumbs-down) [![✅ Check Mark Button](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-de7d614d04dcabee&r=check-mark-button)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-de7d614d04dcabee&r=check-mark-button) [![🧠 Brain](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-de7d614d04dcabee&r=brain)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-de7d614d04dcabee&r=brain) [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-de7d614d04dcabee&theme=dark&v=2)](<https://github.com/Ilverism/PlusMark>)
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+---
+### Data Collection
 
-## Building
+| Stored Data                                                           | Retention & Expiration                                                                                                                              |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reaction groups, Return URLs, counts, and active hashed voter records | **No automatic expiry.** Removing a vote deletes its active record; removing a reaction deletes its associated votes.                               |
+| Aggregate service statistics                                          | No automatic expiry.                                                                                                                                |
+| Browser identity cookie                                               | Up to **400 days**, unless cleared earlier. Expiry does not delete stored votes.                                                                    |
+| Verification and automatic-submission permission                      | **1 hour** from verification.                                                                                                                       |
+| Submission/cancellation records                                       | Expire after **10 minutes**, but deletion happens during subsequent requests and not on a timer. Inactive groups can retain expired records longer. |
+| Saved browser preferences                                             | Remain until removed or browser storage is cleared.                                                                                                 |
+| Browser edit tokens                                                   | Tab-session storage.                                                                                                                                |
+| Cloudflare diagnostic logs                                            | Currently **3 days**.                                                                                                                               |
 
-To create a production version of your app:
+* User data is only used for counting votes and understanding the patterns of problematic actors within the logs to reduce spam and misuse.
 
-```sh
-npm run build
-```
+* PlusMark is designed to be used without any user accounts or extensions.
 
-You can preview the production build with `npm run preview`.
+[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-0f5c9263d686790b&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-0f5c9263d686790b&r=thumbs-up) [![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-0f5c9263d686790b&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-0f5c9263d686790b&r=thumbs-down) [![✅ Check Mark Button](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-0f5c9263d686790b&r=check-mark-button)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-0f5c9263d686790b&r=check-mark-button) [![🧠 Brain](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-0f5c9263d686790b&r=brain)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-0f5c9263d686790b&r=brain) [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-0f5c9263d686790b&theme=dark&v=2)](<https://github.com/Ilverism/PlusMark>)
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+---
+### AI Disclosure
+
+AI was used to assist in the creation of certain aspects of this service.
+
+[![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-17ed37249d274b23&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-17ed37249d274b23&r=thumbs-up) [![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-17ed37249d274b23&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-17ed37249d274b23&r=thumbs-down) [![✅ Check Mark Button](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-17ed37249d274b23&r=check-mark-button)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-17ed37249d274b23&r=check-mark-button) [![🧠 Brain](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-17ed37249d274b23&r=brain)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-17ed37249d274b23&r=brain) [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-17ed37249d274b23&theme=dark&v=2)](<https://github.com/Ilverism/PlusMark>)

@@ -114,6 +114,9 @@ The MarkDown content will not actually be changed in any way. Instead, the image
 
 Note that some formats may appear broken or different from what is expected depending on the renderer.
 
+
+Note that all of the above badges in this section share the same count due to being exact duplicates of the same badges with the same IDs.
+
 [![👍 Thumbs Up](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=thumbs-up)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=thumbs-up) [![👎 Thumbs Down](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=thumbs-down)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=thumbs-down) [![✅ Check Mark Button](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=check-mark-button)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=check-mark-button) [![🧠 Brain](https://plusmark.ilverism.workers.dev/badge?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=brain)](https://plusmark.ilverism.workers.dev/react?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&r=brain) [![Source: https://github.com/Ilverism/PlusMark](https://plusmark.ilverism.workers.dev/source-badge?doc=github-com-ilverism-plusmark-g-6ea7d017695fb797&theme=dark&v=2)](<https://github.com/Ilverism/PlusMark>)
 
 ---

@@ -59,7 +59,7 @@ function ready() {
 	button.disabled = false;
 	button.hidden = false;
 	automaticRow.hidden = false;
-	status.textContent = '• Ready. Press <b>Submit Reaction</b> to record your vote.';
+	status.textContent = '• Ready. Press Submit Reaction to record your vote.';
 }
 
 async function cancelAutomatic() {

@@ -11,7 +11,7 @@ export function reactionPage(options: { doc: string; action: string; ticket: str
 	<main>
 		<span id="vote-delta" role="img" aria-label="${options.hasVoted ? 'Remove your vote' : 'Add your vote'}">${options.hasVoted ? '−1' : '+1'}</span>
 		<h1>${escapeHtml(options.label)}</h1>
-		<p id="status" role="status" aria-live="polite">${options.verified ? '• Ready. Press <b>Submit Reaction</b> to record your vote.' : '• Complete the security check, then press <b>Submit Reaction</b>.'}</p>
+		<p id="status" role="status" aria-live="polite">${options.verified ? '• Ready. Press Submit Reaction to record your vote.' : '• Complete the security check, then press Submit Reaction.'}</p>
 		<span>• Submitting adds (or removes) your reaction vote, then returns you to the source page.</span>
 		<form method="post" action="${escapeHtml(options.action)}" data-verified="${options.verified}" data-automatic="${options.automatic === true}" data-site-key="${escapeHtml(options.siteKey)}" data-ticket-id="${options.ticketId}">
 			<input type="hidden" name="ticket" value="${escapeHtml(options.ticket)}">
